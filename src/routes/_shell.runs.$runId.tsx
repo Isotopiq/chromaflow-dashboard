@@ -296,6 +296,18 @@ function RunDetail() {
           </div>
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Mode</span>
+              <Select value={polarity} onValueChange={(v) => setPolarity(v as "positive" | "negative")}>
+                <SelectTrigger className="h-8 w-28 text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="positive" className="text-xs">ESI +</SelectItem>
+                  <SelectItem value="negative" className="text-xs">ESI −</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center gap-2">
               <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Adduct</span>
               <Select value={adduct} onValueChange={(v) => setAdduct(v as Adduct)}>
                 <SelectTrigger className="h-8 w-32 font-mono text-xs">
