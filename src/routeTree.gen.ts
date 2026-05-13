@@ -9,6 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as SignupRouteImport } from './routes/signup'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as ShellRouteImport } from './routes/_shell'
 import { Route as ShellIndexRouteImport } from './routes/_shell.index'
 import { Route as ShellReportsRouteImport } from './routes/_shell.reports'
@@ -26,6 +29,21 @@ import { Route as ShellMethodsCompareRouteImport } from './routes/_shell.methods
 import { Route as ShellMethodsMethodIdRouteImport } from './routes/_shell.methods.$methodId'
 import { Route as ShellColumnsColumnIdRouteImport } from './routes/_shell.columns.$columnId'
 
+const SignupRoute = SignupRouteImport.update({
+  id: '/signup',
+  path: '/signup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShellRoute = ShellRouteImport.update({
   id: '/_shell',
   getParentRoute: () => rootRouteImport,
@@ -108,6 +126,9 @@ const ShellColumnsColumnIdRoute = ShellColumnsColumnIdRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof ShellIndexRoute
+  '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/signup': typeof SignupRoute
   '/admin': typeof ShellAdminRoute
   '/analytes': typeof ShellAnalytesRoute
   '/batches': typeof ShellBatchesRoute
@@ -124,6 +145,9 @@ export interface FileRoutesByFullPath {
   '/runs/': typeof ShellRunsIndexRoute
 }
 export interface FileRoutesByTo {
+  '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/signup': typeof SignupRoute
   '/admin': typeof ShellAdminRoute
   '/analytes': typeof ShellAnalytesRoute
   '/batches': typeof ShellBatchesRoute
@@ -143,6 +167,9 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_shell': typeof ShellRouteWithChildren
+  '/login': typeof LoginRoute
+  '/reset-password': typeof ResetPasswordRoute
+  '/signup': typeof SignupRoute
   '/_shell/admin': typeof ShellAdminRoute
   '/_shell/analytes': typeof ShellAnalytesRoute
   '/_shell/batches': typeof ShellBatchesRoute
@@ -163,6 +190,9 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/login'
+    | '/reset-password'
+    | '/signup'
     | '/admin'
     | '/analytes'
     | '/batches'
@@ -179,6 +209,9 @@ export interface FileRouteTypes {
     | '/runs/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/login'
+    | '/reset-password'
+    | '/signup'
     | '/admin'
     | '/analytes'
     | '/batches'
@@ -197,6 +230,9 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_shell'
+    | '/login'
+    | '/reset-password'
+    | '/signup'
     | '/_shell/admin'
     | '/_shell/analytes'
     | '/_shell/batches'
@@ -216,11 +252,35 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   ShellRoute: typeof ShellRouteWithChildren
+  LoginRoute: typeof LoginRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
+  SignupRoute: typeof SignupRoute
   ApiPublicConfigRoute: typeof ApiPublicConfigRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/signup': {
+      id: '/signup'
+      path: '/signup'
+      fullPath: '/signup'
+      preLoaderRoute: typeof SignupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_shell': {
       id: '/_shell'
       path: ''
@@ -374,6 +434,9 @@ const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   ShellRoute: ShellRouteWithChildren,
+  LoginRoute: LoginRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
+  SignupRoute: SignupRoute,
   ApiPublicConfigRoute: ApiPublicConfigRoute,
 }
 export const routeTree = rootRouteImport

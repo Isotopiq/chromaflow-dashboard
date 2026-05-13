@@ -1,0 +1,93 @@
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
+import { getSupabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth-context";
+import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import { FlaskConical } from "lucide-react";
+import { toast } from "sonner";
+
+export const Route = createFileRoute("/login")({
+  component: LoginPage,
+});
+
+function LoginPage() {
+  const { user, loading } = useAuth();
+  const nav = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    if (!loading && user) nav({ to: "/" });
+  }, [user, loading, nav]);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    try {
+      const sb = await getSupabase();
+      const { error } = await sb.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+      toast.success("Signed in");
+      nav({ to: "/" });
+    } catch (err: any) {
+      toast.error(err?.message ?? "Sign-in failed");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <Card className="w-full max-w-sm border-border bg-card p-6">
+        <div className="mb-6 flex items-center gap-2">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <FlaskConical className="h-4 w-4" />
+          </div>
+          <div className="leading-tight">
+            <div className="font-mono text-sm font-semibold">CHROMA.LAB</div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Sign in
+            </div>
+          </div>
+        </div>
+
+        <form onSubmit={submit} className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="email" className="text-xs">Email</Label>
+            <Input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+            />
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="password" className="text-xs">Password</Label>
+            <Input
+              id="password"
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
+          </div>
+          <Button type="submit" disabled={busy} className="mt-2">
+            {busy ? "Signing in…" : "Sign in"}
+          </Button>
+        </form>
+
+        <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
+          <Link to="/signup" className="hover:text-foreground">Create account</Link>
+          <Link to="/reset-password" className="hover:text-foreground">Forgot password?</Link>
+        </div>
+      </Card>
+    </div>
+  );
+}
