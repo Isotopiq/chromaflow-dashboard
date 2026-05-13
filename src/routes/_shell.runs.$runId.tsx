@@ -497,7 +497,7 @@ function RunDetail() {
             <h2 className="text-sm font-semibold">Detected peaks — click any row to extract its EIC</h2>
           </div>
           <div className="p-3">
-            <PeakTable peaks={run.peaks} selectedId={selectedId} onSelect={(p) => setSelected(p.id)} />
+            <PeakTable peaks={run.peaks} selectedId={selectedId} onSelect={(p) => onSelectPeak(p.id)} />
           </div>
         </Card>
 
