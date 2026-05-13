@@ -54,6 +54,9 @@ function RunDetail() {
   const { runId } = Route.useParams();
   const { runs, methods, columns, analytes } = useLab();
   const annotatePeak = useAnnotatePeak();
+  const removeRunLocal = useLab((s) => s.removeRunLocal);
+  const deleteRunFn = useServerFn(deleteRun);
+  const nav = useNavigate();
   const run = runs.find((r) => r.id === runId);
   if (!run) throw notFound();
   const method = methods.find((m) => m.id === run.methodId);
