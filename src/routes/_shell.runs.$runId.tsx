@@ -8,7 +8,18 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
-import { ArrowLeft, Sparkles, Download, Activity } from "lucide-react";
+import { ArrowLeft, Sparkles, Download, Activity, Trash2 } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { ChromatogramPlot } from "@/components/chromatogram-plot";
 import { PeakTable } from "@/components/peak-table";
 import { ago } from "@/lib/mock-data";
