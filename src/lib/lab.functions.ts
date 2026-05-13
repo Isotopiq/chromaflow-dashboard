@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { mzFromFormula } from "./chem";
 import {
   fetchAllForUser,
   getCurrentUserProfile,
