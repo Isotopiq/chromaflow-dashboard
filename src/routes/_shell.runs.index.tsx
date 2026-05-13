@@ -311,6 +311,7 @@ function RunsList() {
               <TableHead className="text-[10px] uppercase tracking-wider">Peaks</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wider">Size</TableHead>
               <TableHead className="text-[10px] uppercase tracking-wider">Acquired</TableHead>
+              <TableHead className="w-10"></TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
