@@ -1,12 +1,21 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLab } from "@/lib/store";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, FileWarning } from "lucide-react";
+import { Upload, FileWarning, Loader2 } from "lucide-react";
 import { ChromatogramPlot } from "@/components/chromatogram-plot";
 import { ago } from "@/lib/mock-data";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -16,29 +25,151 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { toast } from "sonner";
+import { createRun, createUploadUrl } from "@/lib/lab.functions";
+import { getSupabase } from "@/integrations/supabase/client";
+import type { WorkerRunSummary } from "@/workers/mzml.worker";
 
 export const Route = createFileRoute("/_shell/runs/")({
   component: RunsList,
 });
 
+type ParseJob = {
+  id: string;
+  filename: string;
+  status: "parsing" | "uploading" | "saving" | "done" | "error";
+  message?: string;
+};
+
+function fmtBytes(n: number) {
+  if (n < 1024) return `${n} B`;
+  if (n < 1_048_576) return `${(n / 1024).toFixed(1)} KB`;
+  return `${(n / 1_048_576).toFixed(1)} MB`;
+}
+
 function RunsList() {
-  const { runs, methods } = useLab();
+  const { runs, methods, columns } = useLab();
   const [dragOver, setDragOver] = useState(false);
+  const [methodId, setMethodId] = useState<string>("");
+  const [columnId, setColumnId] = useState<string>("");
+  const [jobs, setJobs] = useState<ParseJob[]>([]);
+  const workerRef = useRef<Worker | null>(null);
+  const nav = useNavigate();
+  const qc = useQueryClient();
+
+  const createRunFn = useServerFn(createRun);
+  const createUploadUrlFn = useServerFn(createUploadUrl);
+
+  useEffect(() => {
+    workerRef.current = new Worker(
+      new URL("../workers/mzml.worker.ts", import.meta.url),
+      { type: "module" },
+    );
+    return () => workerRef.current?.terminate();
+  }, []);
+
+  useEffect(() => {
+    if (!methodId && methods[0]) setMethodId(methods[0].id);
+    if (!columnId && columns[0]) setColumnId(columns[0].id);
+  }, [methods, columns, methodId, columnId]);
+
+  const updateJob = (id: string, patch: Partial<ParseJob>) =>
+    setJobs((xs) => xs.map((j) => (j.id === id ? { ...j, ...patch } : j)));
+
+  async function processFile(file: File) {
+    const id = crypto.randomUUID();
+    const job: ParseJob = { id, filename: file.name, status: "parsing" };
+    setJobs((xs) => [job, ...xs]);
+
+    try {
+      const text = await file.text();
+      const parsed = await new Promise<{ summary: WorkerRunSummary; scansBlob: Uint8Array }>(
+        (resolve, reject) => {
+          const w = workerRef.current!;
+          const handler = (e: MessageEvent) => {
+            if (e.data?.id !== id) return;
+            w.removeEventListener("message", handler);
+            if (e.data.ok) resolve({ summary: e.data.summary, scansBlob: e.data.scansBlob });
+            else reject(new Error(e.data.error || "Parse failed"));
+          };
+          w.addEventListener("message", handler);
+          w.postMessage({ id, text });
+        },
+      );
+
+      updateJob(id, { status: "uploading" });
+
+      const sb = await getSupabase();
+      const [rawUrl, scansUrl] = await Promise.all([
+        createUploadUrlFn({ data: { filename: file.name, bucket: "raw-runs" } }),
+        createUploadUrlFn({
+          data: { filename: file.name, bucket: "raw-runs", suffix: ".scans.bin" },
+        }),
+      ]);
+
+      const upRaw = await sb.storage
+        .from("raw-runs")
+        .uploadToSignedUrl(rawUrl.path, rawUrl.token, file);
+      if (upRaw.error) throw upRaw.error;
+
+      const blobFile = new Blob([parsed.scansBlob], { type: "application/octet-stream" });
+      const upScans = await sb.storage
+        .from("raw-runs")
+        .uploadToSignedUrl(scansUrl.path, scansUrl.token, blobFile);
+      if (upScans.error) throw upScans.error;
+
+      updateJob(id, { status: "saving" });
+
+      const saved = await createRunFn({
+        data: {
+          name: file.name,
+          methodId: methodId || null,
+          columnId: columnId || null,
+          batchId: null,
+          filePath: rawUrl.path,
+          scansBlobPath: scansUrl.path,
+          fileFormat: parsed.summary.format,
+          fileSize: fmtBytes(file.size),
+          ionMode: parsed.summary.ionMode,
+          msLevel: 1,
+          trace: parsed.summary.trace,
+          peaks: parsed.summary.peaks.map((p) => ({
+            rt: p.rt,
+            area: p.area,
+            height: p.height,
+            fwhm: p.fwhm,
+            sn: p.sn,
+            mz: p.mz,
+            mzLow: p.mzLow,
+            mzHigh: p.mzHigh,
+          })),
+        },
+      });
+
+      updateJob(id, { status: "done" });
+      toast.success(`${file.name} parsed: ${parsed.summary.peaks.length} peaks${parsed.summary.truncated ? " (scans truncated)" : ""}`);
+      qc.invalidateQueries({ queryKey: ["lab"] });
+      nav({ to: "/runs/$runId", params: { runId: (saved as any).id } });
+    } catch (err: any) {
+      console.error(err);
+      updateJob(id, { status: "error", message: err?.message ?? String(err) });
+      toast.error(`${file.name}: ${err?.message ?? "Failed"}`);
+    }
+  }
 
   const handleFiles = (files: FileList | null) => {
     if (!files || files.length === 0) return;
-    const names = Array.from(files).map((f) => f.name);
-    const unsupported = names.find((n) => /\.(raw|wiff|d)$/i.test(n));
-    if (unsupported) {
-      toast.warning(
-        `${unsupported} is a vendor binary format. Convert to mzML with msconvert (ProteoWizard) for chromatogram extraction.`,
-      );
-    }
-    const supported = names.filter((n) => /\.mz(ML|XML)$/i.test(n));
-    if (supported.length > 0) {
-      toast.success(
-        `Queued ${supported.length} file(s) for parsing. (Worker-based mzML parser ships in phase 2.)`,
-      );
+    for (const f of Array.from(files)) {
+      if (/\.(raw|wiff|d)$/i.test(f.name)) {
+        toast.warning(
+          `${f.name} is a vendor binary format. Convert to mzML with msconvert (ProteoWizard) first.`,
+        );
+        continue;
+      }
+      if (!/\.mz(ML|XML)$/i.test(f.name)) {
+        toast.error(`${f.name}: unsupported format`);
+        continue;
+      }
+      processFile(f);
     }
   };
 
@@ -50,15 +181,35 @@ function RunsList() {
         </div>
         <h1 className="mt-1 text-2xl font-semibold tracking-tight">Runs & uploads</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Drop mzML files here. Parsed runs appear below — click to view chromatograms and peaks.
+          Drop mzML / mzXML files. Parsed in your browser, peaks &amp; per-scan EIC data
+          persisted to your Supabase. Click any peak in a run to see its extracted ion
+          chromatogram.
         </p>
       </div>
 
+      <div className="grid gap-3 md:grid-cols-2">
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-muted-foreground">Method</label>
+          <Select value={methodId} onValueChange={setMethodId}>
+            <SelectTrigger className="mt-1 h-9 text-xs"><SelectValue placeholder="Select method" /></SelectTrigger>
+            <SelectContent>
+              {methods.map((m) => <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <label className="text-[10px] uppercase tracking-widest text-muted-foreground">Column</label>
+          <Select value={columnId} onValueChange={setColumnId}>
+            <SelectTrigger className="mt-1 h-9 text-xs"><SelectValue placeholder="Select column" /></SelectTrigger>
+            <SelectContent>
+              {columns.map((c) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+
       <Card
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
+        onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
         onDragLeave={() => setDragOver(false)}
         onDrop={(e) => {
           e.preventDefault();
@@ -72,14 +223,9 @@ function RunsList() {
         <Upload className="h-6 w-6 text-muted-foreground" />
         <div className="text-sm font-medium">Drop mzML / mzXML files</div>
         <p className="max-w-md text-center text-xs text-muted-foreground">
-          Files are parsed in the browser via Web Worker. Vendor formats (.raw, .wiff, .d) need
-          conversion via{" "}
-          <a
-            href="https://proteowizard.sourceforge.io/"
-            target="_blank"
-            rel="noreferrer"
-            className="text-primary underline"
-          >
+          Files are parsed in the browser via Web Worker. Vendor formats (.raw, .wiff, .d)
+          need conversion with{" "}
+          <a href="https://proteowizard.sourceforge.io/" target="_blank" rel="noreferrer" className="text-primary underline">
             ProteoWizard msconvert
           </a>{" "}
           first.
@@ -88,7 +234,7 @@ function RunsList() {
           <input
             type="file"
             multiple
-            accept=".mzML,.mzXML,.raw,.wiff,.d"
+            accept=".mzML,.mzXML"
             className="hidden"
             onChange={(e) => handleFiles(e.target.files)}
           />
@@ -98,13 +244,37 @@ function RunsList() {
         </label>
       </Card>
 
-      <div className="flex items-start gap-2 rounded-md border border-[color:var(--status-warn)]/40 bg-[color:var(--status-warn)]/5 p-3 text-[11px]">
-        <FileWarning className="mt-0.5 h-3.5 w-3.5 text-[color:var(--status-warn)]" />
-        <div className="text-muted-foreground">
-          Phase 1 demo data. Real client-side mzML parsing (pako + fast-xml-parser in a Web Worker)
-          is wired in phase 2 once Lovable Cloud or your Supabase is connected.
+      {jobs.length > 0 && (
+        <Card className="border-border bg-card p-0">
+          <div className="border-b border-border px-4 py-3">
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">In flight</div>
+            <h2 className="text-sm font-semibold">{jobs.length} parse job(s)</h2>
+          </div>
+          <ul className="divide-y divide-border">
+            {jobs.map((j) => (
+              <li key={j.id} className="flex items-center justify-between px-4 py-2 text-xs">
+                <div className="font-mono">{j.filename}</div>
+                <div className="flex items-center gap-2">
+                  {j.status !== "done" && j.status !== "error" && (
+                    <Loader2 className="h-3 w-3 animate-spin text-muted-foreground" />
+                  )}
+                  <Badge variant="outline" className="text-[10px]">{j.status}</Badge>
+                  {j.message && <span className="text-[color:var(--status-error)]">{j.message}</span>}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
+
+      {runs.length === 0 && (
+        <div className="flex items-start gap-2 rounded-md border border-[color:var(--status-warn)]/40 bg-[color:var(--status-warn)]/5 p-3 text-[11px]">
+          <FileWarning className="mt-0.5 h-3.5 w-3.5 text-[color:var(--status-warn)]" />
+          <div className="text-muted-foreground">
+            No runs yet. Drop an mzML file above to extract chromatograms, peaks and per-peak EIC traces.
+          </div>
         </div>
-      </div>
+      )}
 
       <Card className="border-border bg-card p-0">
         <div className="border-b border-border px-4 py-3">
@@ -156,22 +326,22 @@ function RunsList() {
         </Table>
       </Card>
 
-      <Card className="border-border bg-card p-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div>
-            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-              Latest acquisition
+      {runs[0] && (
+        <Card className="border-border bg-card p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <div>
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Latest acquisition
+              </div>
+              <h2 className="text-sm font-semibold">{runs[0]?.name}</h2>
             </div>
-            <h2 className="text-sm font-semibold">{runs[0]?.name}</h2>
+            <Button asChild size="sm" variant="outline">
+              <Link to="/runs/$runId" params={{ runId: runs[0].id }}>Open viewer</Link>
+            </Button>
           </div>
-          <Button asChild size="sm" variant="outline">
-            <Link to="/runs/$runId" params={{ runId: runs[0]?.id ?? "" }}>
-              Open viewer
-            </Link>
-          </Button>
-        </div>
-        <ChromatogramPlot runs={[runs[0]]} height={220} showPeaks />
-      </Card>
+          <ChromatogramPlot runs={[runs[0]]} height={220} showPeaks />
+        </Card>
+      )}
     </div>
   );
 }
