@@ -111,7 +111,7 @@ function RunsList() {
         .uploadToSignedUrl(rawUrl.path, rawUrl.token, file);
       if (upRaw.error) throw upRaw.error;
 
-      const blobFile = new Blob([parsed.scansBlob], { type: "application/octet-stream" });
+      const blobFile = new Blob([parsed.scansBlob as BlobPart], { type: "application/octet-stream" });
       const upScans = await sb.storage
         .from("raw-runs")
         .uploadToSignedUrl(scansUrl.path, scansUrl.token, blobFile);
