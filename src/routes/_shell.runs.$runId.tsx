@@ -94,9 +94,26 @@ function RunDetail() {
   }, [eicQuery.data, eicMz, ppm]);
 
   // ---- Auto-XIC from analyte library ----
-  const adductOptions: Adduct[] = run.ionMode === "negative" ? ADDUCTS_NEG : ADDUCTS_POS;
-  const [adduct, setAdduct] = useState<Adduct>(defaultAdduct(run.ionMode ?? "positive"));
+  const [polarity, setPolarity] = useState<"positive" | "negative">(
+    run.ionMode === "negative" ? "negative" : "positive",
+  );
+  const adductOptions: Adduct[] = polarity === "negative" ? ADDUCTS_NEG : ADDUCTS_POS;
+  const [adduct, setAdduct] = useState<Adduct>(defaultAdduct(polarity));
+  // Keep adduct valid when polarity flips.
+  useEffect(() => {
+    if (!adductOptions.includes(adduct)) setAdduct(defaultAdduct(polarity));
+  }, [polarity, adductOptions, adduct]);
   const [rtTol, setRtTol] = useState(1.0);
+
+  const eicCardRef = useRef<HTMLDivElement | null>(null);
+  const onSelectPeak = (id: string) => {
+    setSelected(id);
+    // Clear any prior custom m/z so the selected peak's m/z (if any) takes over.
+    setCustomMz("");
+    requestAnimationFrame(() => {
+      eicCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  };
 
   const libraryTargets = useMemo(() => {
     return analytes
