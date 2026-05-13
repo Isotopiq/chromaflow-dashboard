@@ -79,6 +79,72 @@ function RunDetail() {
     };
   }, [eicQuery.data, eicMz, ppm]);
 
+  // ---- Auto-XIC from analyte library ----
+  const adductOptions: Adduct[] = run.ionMode === "negative" ? ADDUCTS_NEG : ADDUCTS_POS;
+  const [adduct, setAdduct] = useState<Adduct>(defaultAdduct(run.ionMode ?? "positive"));
+  const [rtTol, setRtTol] = useState(1.0);
+
+  const libraryTargets = useMemo(() => {
+    return analytes
+      .map((a) => {
+        // Prefer recomputed m/z from formula+adduct; fall back to analyte.mz.
+        const computed = a.formula ? mzFromFormula(a.formula, adduct) : null;
+        const mz = computed ?? (Number.isFinite(a.mz) ? a.mz : null);
+        return mz != null ? { id: a.id, name: a.name, formula: a.formula, mz, rtExpected: a.rtExpected } : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+  }, [analytes, adduct]);
+
+  const [enabledIds, setEnabledIds] = useState<Set<string>>(new Set());
+  // Initialize selection on first render to all targets within a reasonable mass range.
+  useMemo(() => {
+    if (enabledIds.size === 0 && libraryTargets.length > 0) {
+      setEnabledIds(new Set(libraryTargets.slice(0, 8).map((t) => t.id)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libraryTargets.length]);
+
+  const fetchBatch = useServerFn(getRunEICBatch);
+  const activeTargets = libraryTargets.filter((t) => enabledIds.has(t.id));
+  const batchKey = activeTargets.map((t) => `${t.id}:${t.mz.toFixed(4)}`).join("|");
+  const batchQuery = useQuery({
+    queryKey: ["eic-batch", run.id, batchKey, ppm],
+    enabled: activeTargets.length > 0 && !!run.scansBlobPath,
+    queryFn: () =>
+      fetchBatch({
+        data: {
+          runId: run.id,
+          ppm,
+          targets: activeTargets.map((t) => ({ id: t.id, mz: t.mz })),
+        },
+      }),
+    staleTime: 60_000,
+  });
+
+  const overlayRuns = useMemo(() => {
+    if (!batchQuery.data) return [];
+    const x = batchQuery.data.x;
+    return batchQuery.data.traces.map((tr) => {
+      const t = activeTargets.find((a) => a.id === tr.id);
+      return {
+        id: tr.id,
+        name: t ? `${t.name} (${tr.mz.toFixed(4)})` : tr.mz.toFixed(4),
+        trace: { x, tic: tr.y, bpc: tr.y },
+      };
+    });
+  }, [batchQuery.data, activeTargets]);
+
+  const matchRows = useMemo(() => {
+    if (!batchQuery.data) return [];
+    return batchQuery.data.traces.map((tr) => {
+      const t = activeTargets.find((a) => a.id === tr.id);
+      const dRt = t && tr.peakRt != null ? Math.abs(tr.peakRt - t.rtExpected) : null;
+      const matched = tr.peakIntensity > 0 && (dRt == null || dRt <= rtTol);
+      return { tr, t, dRt, matched };
+    });
+  }, [batchQuery.data, activeTargets, rtTol]);
+
+
   const suggested = analytes
     .map((a) => {
       const dRt = Math.abs(a.rtExpected - (selected?.rt ?? 0));
