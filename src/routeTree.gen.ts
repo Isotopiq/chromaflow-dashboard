@@ -11,6 +11,10 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ShellRouteImport } from './routes/_shell'
 import { Route as ShellIndexRouteImport } from './routes/_shell.index'
+import { Route as ShellMethodsIndexRouteImport } from './routes/_shell.methods.index'
+import { Route as ShellMethodsNewRouteImport } from './routes/_shell.methods.new'
+import { Route as ShellMethodsCompareRouteImport } from './routes/_shell.methods.compare'
+import { Route as ShellMethodsMethodIdRouteImport } from './routes/_shell.methods.$methodId'
 
 const ShellRoute = ShellRouteImport.update({
   id: '/_shell',
@@ -21,24 +25,73 @@ const ShellIndexRoute = ShellIndexRouteImport.update({
   path: '/',
   getParentRoute: () => ShellRoute,
 } as any)
+const ShellMethodsIndexRoute = ShellMethodsIndexRouteImport.update({
+  id: '/methods/',
+  path: '/methods/',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellMethodsNewRoute = ShellMethodsNewRouteImport.update({
+  id: '/methods/new',
+  path: '/methods/new',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellMethodsCompareRoute = ShellMethodsCompareRouteImport.update({
+  id: '/methods/compare',
+  path: '/methods/compare',
+  getParentRoute: () => ShellRoute,
+} as any)
+const ShellMethodsMethodIdRoute = ShellMethodsMethodIdRouteImport.update({
+  id: '/methods/$methodId',
+  path: '/methods/$methodId',
+  getParentRoute: () => ShellRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof ShellIndexRoute
+  '/methods/$methodId': typeof ShellMethodsMethodIdRoute
+  '/methods/compare': typeof ShellMethodsCompareRoute
+  '/methods/new': typeof ShellMethodsNewRoute
+  '/methods/': typeof ShellMethodsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof ShellIndexRoute
+  '/methods/$methodId': typeof ShellMethodsMethodIdRoute
+  '/methods/compare': typeof ShellMethodsCompareRoute
+  '/methods/new': typeof ShellMethodsNewRoute
+  '/methods': typeof ShellMethodsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_shell': typeof ShellRouteWithChildren
   '/_shell/': typeof ShellIndexRoute
+  '/_shell/methods/$methodId': typeof ShellMethodsMethodIdRoute
+  '/_shell/methods/compare': typeof ShellMethodsCompareRoute
+  '/_shell/methods/new': typeof ShellMethodsNewRoute
+  '/_shell/methods/': typeof ShellMethodsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/methods/$methodId'
+    | '/methods/compare'
+    | '/methods/new'
+    | '/methods/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/_shell' | '/_shell/'
+  to:
+    | '/'
+    | '/methods/$methodId'
+    | '/methods/compare'
+    | '/methods/new'
+    | '/methods'
+  id:
+    | '__root__'
+    | '/_shell'
+    | '/_shell/'
+    | '/_shell/methods/$methodId'
+    | '/_shell/methods/compare'
+    | '/_shell/methods/new'
+    | '/_shell/methods/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -61,15 +114,51 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellIndexRouteImport
       parentRoute: typeof ShellRoute
     }
+    '/_shell/methods/': {
+      id: '/_shell/methods/'
+      path: '/methods'
+      fullPath: '/methods/'
+      preLoaderRoute: typeof ShellMethodsIndexRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/methods/new': {
+      id: '/_shell/methods/new'
+      path: '/methods/new'
+      fullPath: '/methods/new'
+      preLoaderRoute: typeof ShellMethodsNewRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/methods/compare': {
+      id: '/_shell/methods/compare'
+      path: '/methods/compare'
+      fullPath: '/methods/compare'
+      preLoaderRoute: typeof ShellMethodsCompareRouteImport
+      parentRoute: typeof ShellRoute
+    }
+    '/_shell/methods/$methodId': {
+      id: '/_shell/methods/$methodId'
+      path: '/methods/$methodId'
+      fullPath: '/methods/$methodId'
+      preLoaderRoute: typeof ShellMethodsMethodIdRouteImport
+      parentRoute: typeof ShellRoute
+    }
   }
 }
 
 interface ShellRouteChildren {
   ShellIndexRoute: typeof ShellIndexRoute
+  ShellMethodsMethodIdRoute: typeof ShellMethodsMethodIdRoute
+  ShellMethodsCompareRoute: typeof ShellMethodsCompareRoute
+  ShellMethodsNewRoute: typeof ShellMethodsNewRoute
+  ShellMethodsIndexRoute: typeof ShellMethodsIndexRoute
 }
 
 const ShellRouteChildren: ShellRouteChildren = {
   ShellIndexRoute: ShellIndexRoute,
+  ShellMethodsMethodIdRoute: ShellMethodsMethodIdRoute,
+  ShellMethodsCompareRoute: ShellMethodsCompareRoute,
+  ShellMethodsNewRoute: ShellMethodsNewRoute,
+  ShellMethodsIndexRoute: ShellMethodsIndexRoute,
 }
 
 const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
