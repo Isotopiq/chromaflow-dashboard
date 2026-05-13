@@ -17,6 +17,8 @@ export type Peak = {
   fwhm: number; // min
   sn: number;
   mz?: number;
+  mzLow?: number;
+  mzHigh?: number;
   analyteId?: string;
   analyteName?: string;
   confidence?: number;
@@ -36,6 +38,8 @@ export type Run = {
   trace: { x: number[]; tic: number[]; bpc: number[] };
   peaks: Peak[];
   ionMode: "positive" | "negative";
+  scansBlobPath?: string | null;
+  msLevel?: number;
 };
 
 export type GradientStep = { time: number; pctB: number; flow: number };

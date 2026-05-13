@@ -67,6 +67,8 @@ export function mapPeak(r: any): Peak {
     fwhm: Number(r.fwhm ?? 0),
     sn: Number(r.sn ?? 0),
     mz: r.mz != null ? Number(r.mz) : undefined,
+    mzLow: r.mz_low != null ? Number(r.mz_low) : undefined,
+    mzHigh: r.mz_high != null ? Number(r.mz_high) : undefined,
     analyteId: r.analyte_id ?? undefined,
     analyteName: r.analyte_name ?? undefined,
     confidence: r.confidence != null ? Number(r.confidence) : undefined,
@@ -89,6 +91,8 @@ export function mapRun(r: any, peaks: Peak[] = []): Run {
     trace: s.trace ?? { x: [], tic: [], bpc: [] },
     peaks,
     ionMode: (s.ionMode as Run["ionMode"]) ?? "positive",
+    scansBlobPath: r.scans_blob_path ?? null,
+    msLevel: r.ms_level ?? 1,
   };
 }
 

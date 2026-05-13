@@ -192,9 +192,11 @@ const RunInput = z.object({
   columnId: z.string().optional().nullable(),
   batchId: z.string().optional().nullable(),
   filePath: z.string().max(500),
+  scansBlobPath: z.string().max(500).optional().nullable(),
   fileFormat: z.enum(["mzML", "mzXML", "raw"]).default("mzML"),
   fileSize: z.string().max(40),
   ionMode: z.enum(["positive", "negative"]).default("positive"),
+  msLevel: z.number().int().min(1).max(3).default(1),
   trace: z.object({
     x: z.array(z.number()).max(20000),
     tic: z.array(z.number()).max(20000),
@@ -208,7 +210,9 @@ const RunInput = z.object({
         height: z.number(),
         fwhm: z.number(),
         sn: z.number(),
-        mz: z.number().optional(),
+        mz: z.number().nullable().optional(),
+        mzLow: z.number().nullable().optional(),
+        mzHigh: z.number().nullable().optional(),
       }),
     )
     .max(2000),
@@ -227,6 +231,8 @@ export const createRun = createServerFn({ method: "POST" })
         batch_id: data.batchId || null,
         file_path: data.filePath,
         file_format: data.fileFormat,
+        scans_blob_path: data.scansBlobPath || null,
+        ms_level: data.msLevel,
         parsed_status: "parsed",
         summary_json: {
           name: data.name,
@@ -253,6 +259,8 @@ export const createRun = createServerFn({ method: "POST" })
             fwhm: p.fwhm,
             sn: p.sn,
             mz: p.mz ?? null,
+            mz_low: p.mzLow ?? null,
+            mz_high: p.mzHigh ?? null,
           })),
         )
         .select();
@@ -295,6 +303,36 @@ export const annotatePeak = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// ---- EIC: extract on the server from the persisted scans blob ----
+const EICInput = z.object({
+  runId: z.string(),
+  mz: z.number().min(0).max(10000),
+  ppm: z.number().min(1).max(200).default(10),
+});
+export const getRunEIC = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => EICInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context as any;
+    const { data: run, error } = await supabase
+      .from("runs")
+      .select("scans_blob_path")
+      .eq("id", data.runId)
+      .single();
+    if (error) throw error;
+    if (!run?.scans_blob_path) {
+      return { x: [] as number[], y: [] as number[], mz: data.mz, ppm: data.ppm, mzLow: 0, mzHigh: 0 };
+    }
+    const { data: blob, error: dlErr } = await supabase.storage
+      .from("raw-runs")
+      .download(run.scans_blob_path);
+    if (dlErr) throw dlErr;
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    const { extractEICFromBlob } = await import("./eic");
+    const trace = extractEICFromBlob(buf, data.mz, data.ppm);
+    return trace;
+  });
+
 // ---- Admin ----
 export const listAdminUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
@@ -328,9 +366,11 @@ export const setUserRole = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// ---- Storage signed-upload for raw files ----
+// ---- Storage signed-upload for raw / scans / report files ----
 const UploadUrlInput = z.object({
   filename: z.string().min(1).max(300),
+  bucket: z.enum(["raw-runs", "reports"]).default("raw-runs"),
+  suffix: z.string().max(40).optional(),
 });
 export const createUploadUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -338,10 +378,152 @@ export const createUploadUrl = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
     const safe = data.filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const path = `${userId}/${Date.now()}-${safe}`;
+    const stamp = Date.now();
+    const path = `${userId}/${stamp}-${safe}${data.suffix ?? ""}`;
     const { data: up, error } = await supabase.storage
-      .from("raw-runs")
+      .from(data.bucket)
       .createSignedUploadUrl(path);
     if (error) throw error;
-    return { path, token: up.token, signedUrl: up.signedUrl };
+    return { path, token: up.token, signedUrl: up.signedUrl, bucket: data.bucket };
   });
+
+// ---- Reports (record metadata; PDF rendered + uploaded client-side) ----
+const ReportInput = z.object({
+  title: z.string().min(1).max(200),
+  template: z.enum(["run", "batch", "method"]),
+  runIds: z.array(z.string().uuid()).max(50).default([]),
+  batchId: z.string().uuid().optional().nullable(),
+  storagePath: z.string().min(1).max(500),
+});
+export const createReport = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => ReportInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+    const { data: row, error } = await supabase
+      .from("reports")
+      .insert({
+        title: data.title,
+        template: data.template,
+        run_ids: data.runIds,
+        batch_id: data.batchId ?? null,
+        storage_path: data.storagePath,
+        created_by: userId,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return row;
+  });
+
+export const listReports = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase } = context as any;
+    const { data, error } = await supabase
+      .from("reports")
+      .select("*")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return data ?? [];
+  });
+
+export const getReportSignedUrl = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context as any;
+    const { data: row, error } = await supabase
+      .from("reports")
+      .select("storage_path")
+      .eq("id", data.id)
+      .single();
+    if (error) throw error;
+    const { data: signed, error: se } = await supabase.storage
+      .from("reports")
+      .createSignedUrl(row.storage_path, 60 * 10);
+    if (se) throw se;
+    return { url: signed.signedUrl };
+  });
+
+// ---- Sharing links ----
+const ShareInput = z.object({
+  resourceKind: z.enum(["run", "report"]),
+  resourceId: z.string().uuid(),
+  expiresInHours: z.number().int().min(1).max(24 * 365).default(168),
+});
+export const createShareLink = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => ShareInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+    const token = crypto.randomUUID().replace(/-/g, "");
+    const expires = new Date(Date.now() + data.expiresInHours * 3_600_000).toISOString();
+    const { data: row, error } = await supabase
+      .from("shared_links")
+      .insert({
+        token,
+        resource_kind: data.resourceKind,
+        resource_id: data.resourceId,
+        expires_at: expires,
+        created_by: userId,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return { token: row.token, expiresAt: row.expires_at };
+  });
+
+// ---- Auto-annotate batch ----
+const AutoAnnotateInput = z.object({
+  batchId: z.string().uuid(),
+  rtTolMin: z.number().min(0).max(5).default(0.3),
+  ppmTol: z.number().min(0).max(200).default(10),
+});
+export const autoAnnotateBatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => AutoAnnotateInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+    const [{ data: runs }, { data: analytes }] = await Promise.all([
+      supabase.from("runs").select("id").eq("batch_id", data.batchId),
+      supabase.from("analytes").select("id, name, mz, rt_expected"),
+    ]);
+    if (!runs?.length) return { annotated: 0, scanned: 0 };
+    const runIds = runs.map((r: any) => r.id);
+    const { data: peaks } = await supabase
+      .from("peaks")
+      .select("id, rt, mz, run_id")
+      .in("run_id", runIds);
+
+    let annotated = 0;
+    for (const p of peaks ?? []) {
+      let bestScore = Infinity;
+      let bestA: any = null;
+      for (const a of analytes ?? []) {
+        const dRt = Math.abs(p.rt - Number(a.rt_expected));
+        if (dRt > data.rtTolMin) continue;
+        const dPpm = p.mz != null ? Math.abs((Number(p.mz) - Number(a.mz)) / Number(a.mz)) * 1e6 : 999;
+        if (dPpm > data.ppmTol) continue;
+        const score = dRt * 10 + dPpm;
+        if (score < bestScore) {
+          bestScore = score;
+          bestA = a;
+        }
+      }
+      if (bestA) {
+        await supabase
+          .from("peaks")
+          .update({
+            analyte_id: bestA.id,
+            annotated_by: userId,
+            annotation_source: "auto",
+            confidence: Math.max(0.5, 1 - bestScore / 50),
+          })
+          .eq("id", p.id);
+        annotated++;
+      }
+    }
+    return { annotated, scanned: peaks?.length ?? 0 };
+  });
+
