@@ -19,6 +19,7 @@ import { Route as ShellAdminRouteImport } from './routes/_shell.admin'
 import { Route as ShellRunsIndexRouteImport } from './routes/_shell.runs.index'
 import { Route as ShellMethodsIndexRouteImport } from './routes/_shell.methods.index'
 import { Route as ShellColumnsIndexRouteImport } from './routes/_shell.columns.index'
+import { Route as ApiPublicConfigRouteImport } from './routes/api/public/config'
 import { Route as ShellRunsRunIdRouteImport } from './routes/_shell.runs.$runId'
 import { Route as ShellMethodsNewRouteImport } from './routes/_shell.methods.new'
 import { Route as ShellMethodsCompareRouteImport } from './routes/_shell.methods.compare'
@@ -74,6 +75,11 @@ const ShellColumnsIndexRoute = ShellColumnsIndexRouteImport.update({
   path: '/columns/',
   getParentRoute: () => ShellRoute,
 } as any)
+const ApiPublicConfigRoute = ApiPublicConfigRouteImport.update({
+  id: '/api/public/config',
+  path: '/api/public/config',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShellRunsRunIdRoute = ShellRunsRunIdRouteImport.update({
   id: '/runs/$runId',
   path: '/runs/$runId',
@@ -112,6 +118,7 @@ export interface FileRoutesByFullPath {
   '/methods/compare': typeof ShellMethodsCompareRoute
   '/methods/new': typeof ShellMethodsNewRoute
   '/runs/$runId': typeof ShellRunsRunIdRoute
+  '/api/public/config': typeof ApiPublicConfigRoute
   '/columns/': typeof ShellColumnsIndexRoute
   '/methods/': typeof ShellMethodsIndexRoute
   '/runs/': typeof ShellRunsIndexRoute
@@ -128,6 +135,7 @@ export interface FileRoutesByTo {
   '/methods/compare': typeof ShellMethodsCompareRoute
   '/methods/new': typeof ShellMethodsNewRoute
   '/runs/$runId': typeof ShellRunsRunIdRoute
+  '/api/public/config': typeof ApiPublicConfigRoute
   '/columns': typeof ShellColumnsIndexRoute
   '/methods': typeof ShellMethodsIndexRoute
   '/runs': typeof ShellRunsIndexRoute
@@ -146,6 +154,7 @@ export interface FileRoutesById {
   '/_shell/methods/compare': typeof ShellMethodsCompareRoute
   '/_shell/methods/new': typeof ShellMethodsNewRoute
   '/_shell/runs/$runId': typeof ShellRunsRunIdRoute
+  '/api/public/config': typeof ApiPublicConfigRoute
   '/_shell/columns/': typeof ShellColumnsIndexRoute
   '/_shell/methods/': typeof ShellMethodsIndexRoute
   '/_shell/runs/': typeof ShellRunsIndexRoute
@@ -164,6 +173,7 @@ export interface FileRouteTypes {
     | '/methods/compare'
     | '/methods/new'
     | '/runs/$runId'
+    | '/api/public/config'
     | '/columns/'
     | '/methods/'
     | '/runs/'
@@ -180,6 +190,7 @@ export interface FileRouteTypes {
     | '/methods/compare'
     | '/methods/new'
     | '/runs/$runId'
+    | '/api/public/config'
     | '/columns'
     | '/methods'
     | '/runs'
@@ -197,6 +208,7 @@ export interface FileRouteTypes {
     | '/_shell/methods/compare'
     | '/_shell/methods/new'
     | '/_shell/runs/$runId'
+    | '/api/public/config'
     | '/_shell/columns/'
     | '/_shell/methods/'
     | '/_shell/runs/'
@@ -204,6 +216,7 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   ShellRoute: typeof ShellRouteWithChildren
+  ApiPublicConfigRoute: typeof ApiPublicConfigRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -277,6 +290,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/columns/'
       preLoaderRoute: typeof ShellColumnsIndexRouteImport
       parentRoute: typeof ShellRoute
+    }
+    '/api/public/config': {
+      id: '/api/public/config'
+      path: '/api/public/config'
+      fullPath: '/api/public/config'
+      preLoaderRoute: typeof ApiPublicConfigRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_shell/runs/$runId': {
       id: '/_shell/runs/$runId'
@@ -354,6 +374,7 @@ const ShellRouteWithChildren = ShellRoute._addFileChildren(ShellRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   ShellRoute: ShellRouteWithChildren,
+  ApiPublicConfigRoute: ApiPublicConfigRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
