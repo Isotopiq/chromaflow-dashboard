@@ -218,6 +218,39 @@ function RunDetail() {
           <Button variant="outline" size="sm" onClick={downloadCsv}>
             <Download className="mr-1 h-3.5 w-3.5" /> Peaks CSV
           </Button>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="text-destructive hover:text-destructive">
+                <Trash2 className="mr-1 h-3.5 w-3.5" /> Delete run
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete this run?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Permanently removes <span className="font-mono">{run.name}</span>, its
+                  peaks, and uploaded raw / scan files. This can't be undone.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={async () => {
+                    try {
+                      await deleteRunFn({ data: { runId: run.id } });
+                      removeRunLocal(run.id);
+                      toast.success(`Deleted ${run.name}`);
+                      nav({ to: "/runs" });
+                    } catch (e: any) {
+                      toast.error(e?.message ?? "Failed to delete run");
+                    }
+                  }}
+                >
+                  Delete
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </div>
 
