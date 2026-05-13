@@ -479,7 +479,9 @@ function RunDetail() {
           </div>
         ) : eicMz == null ? (
           <div className="rounded-md border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
-            Select a peak from the table below to extract its ion chromatogram.
+            {selected
+              ? `Selected peak at RT ${selected.rt.toFixed(2)} min has no associated m/z. Enter a custom m/z above to extract its ion chromatogram, or pick a compound from the library section above.`
+              : "Select a peak from the table below to extract its ion chromatogram."}
           </div>
         ) : eicQuery.isLoading ? (
           <div className="p-6 text-center text-xs text-muted-foreground">Extracting EIC…</div>
