@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { useTheme } from "@/components/theme-provider";
 
 export function Topbar({ title, subtitle }: { title?: string; subtitle?: string }) {
+  const { theme, toggle } = useTheme();
   return (
     <header className="sticky top-0 z-10 flex h-14 shrink-0 items-center gap-3 border-b border-border bg-background/80 px-4 backdrop-blur">
       <SidebarTrigger className="-ml-1" />
