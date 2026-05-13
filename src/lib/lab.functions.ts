@@ -333,6 +333,60 @@ export const getRunEIC = createServerFn({ method: "POST" })
     return trace;
   });
 
+// ---- Batch EIC: extract many m/z from a single scans-blob download ----
+const EICBatchInput = z.object({
+  runId: z.string(),
+  ppm: z.number().min(1).max(200).default(10),
+  targets: z
+    .array(z.object({ id: z.string().max(80), mz: z.number().min(0).max(10000) }))
+    .min(1)
+    .max(50),
+});
+export const getRunEICBatch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => EICBatchInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase } = context as any;
+    const { data: run, error } = await supabase
+      .from("runs")
+      .select("scans_blob_path")
+      .eq("id", data.runId)
+      .single();
+    if (error) throw error;
+    if (!run?.scans_blob_path) {
+      return { x: [] as number[], traces: [] as Array<any> };
+    }
+    const { data: blob, error: dlErr } = await supabase.storage
+      .from("raw-runs")
+      .download(run.scans_blob_path);
+    if (dlErr) throw dlErr;
+    const buf = new Uint8Array(await blob.arrayBuffer());
+    const { unpackScans, extractEIC } = await import("./eic");
+    const scans = unpackScans(buf);
+    const x = scans.map((s) => s.rt);
+    const traces = data.targets.map((t) => {
+      const tr = extractEIC(scans, t.mz, data.ppm);
+      let peakIdx = -1;
+      let peakInt = 0;
+      for (let i = 0; i < tr.y.length; i++) {
+        if (tr.y[i] > peakInt) {
+          peakInt = tr.y[i];
+          peakIdx = i;
+        }
+      }
+      return {
+        id: t.id,
+        mz: t.mz,
+        y: tr.y,
+        mzLow: tr.mzLow,
+        mzHigh: tr.mzHigh,
+        peakRt: peakIdx >= 0 ? tr.x[peakIdx] : null,
+        peakIntensity: peakInt,
+      };
+    });
+    return { x, traces };
+  });
+
 // ---- Admin ----
 export const listAdminUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

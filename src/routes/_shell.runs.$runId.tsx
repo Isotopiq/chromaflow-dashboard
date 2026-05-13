@@ -13,7 +13,24 @@ import { ChromatogramPlot } from "@/components/chromatogram-plot";
 import { PeakTable } from "@/components/peak-table";
 import { ago } from "@/lib/mock-data";
 import { toast } from "sonner";
-import { getRunEIC } from "@/lib/lab.functions";
+import { getRunEIC, getRunEICBatch } from "@/lib/lab.functions";
+import { mzFromFormula, defaultAdduct, ADDUCTS_POS, ADDUCTS_NEG, type Adduct } from "@/lib/chem";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export const Route = createFileRoute("/_shell/runs/$runId")({
   component: RunDetail,
@@ -61,6 +78,72 @@ function RunDetail() {
       trace: { x: eicQuery.data.x, tic: eicQuery.data.y, bpc: eicQuery.data.y },
     };
   }, [eicQuery.data, eicMz, ppm]);
+
+  // ---- Auto-XIC from analyte library ----
+  const adductOptions: Adduct[] = run.ionMode === "negative" ? ADDUCTS_NEG : ADDUCTS_POS;
+  const [adduct, setAdduct] = useState<Adduct>(defaultAdduct(run.ionMode ?? "positive"));
+  const [rtTol, setRtTol] = useState(1.0);
+
+  const libraryTargets = useMemo(() => {
+    return analytes
+      .map((a) => {
+        // Prefer recomputed m/z from formula+adduct; fall back to analyte.mz.
+        const computed = a.formula ? mzFromFormula(a.formula, adduct) : null;
+        const mz = computed ?? (Number.isFinite(a.mz) ? a.mz : null);
+        return mz != null ? { id: a.id, name: a.name, formula: a.formula, mz, rtExpected: a.rtExpected } : null;
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+  }, [analytes, adduct]);
+
+  const [enabledIds, setEnabledIds] = useState<Set<string>>(new Set());
+  // Initialize selection on first render to all targets within a reasonable mass range.
+  useMemo(() => {
+    if (enabledIds.size === 0 && libraryTargets.length > 0) {
+      setEnabledIds(new Set(libraryTargets.slice(0, 8).map((t) => t.id)));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [libraryTargets.length]);
+
+  const fetchBatch = useServerFn(getRunEICBatch);
+  const activeTargets = libraryTargets.filter((t) => enabledIds.has(t.id));
+  const batchKey = activeTargets.map((t) => `${t.id}:${t.mz.toFixed(4)}`).join("|");
+  const batchQuery = useQuery({
+    queryKey: ["eic-batch", run.id, batchKey, ppm],
+    enabled: activeTargets.length > 0 && !!run.scansBlobPath,
+    queryFn: () =>
+      fetchBatch({
+        data: {
+          runId: run.id,
+          ppm,
+          targets: activeTargets.map((t) => ({ id: t.id, mz: t.mz })),
+        },
+      }),
+    staleTime: 60_000,
+  });
+
+  const overlayRuns = useMemo(() => {
+    if (!batchQuery.data) return [];
+    const x = batchQuery.data.x;
+    return batchQuery.data.traces.map((tr) => {
+      const t = activeTargets.find((a) => a.id === tr.id);
+      return {
+        id: tr.id,
+        name: t ? `${t.name} (${tr.mz.toFixed(4)})` : tr.mz.toFixed(4),
+        trace: { x, tic: tr.y, bpc: tr.y },
+      };
+    });
+  }, [batchQuery.data, activeTargets]);
+
+  const matchRows = useMemo(() => {
+    if (!batchQuery.data) return [];
+    return batchQuery.data.traces.map((tr) => {
+      const t = activeTargets.find((a) => a.id === tr.id);
+      const dRt = t && tr.peakRt != null ? Math.abs(tr.peakRt - t.rtExpected) : null;
+      const matched = tr.peakIntensity > 0 && (dRt == null || dRt <= rtTol);
+      return { tr, t, dRt, matched };
+    });
+  }, [batchQuery.data, activeTargets, rtTol]);
+
 
   const suggested = analytes
     .map((a) => {
@@ -135,6 +218,149 @@ function RunDetail() {
           </div>
         </div>
         <ChromatogramPlot runs={[run]} height={260} showPeaks />
+      </Card>
+
+      <Card className="border-border bg-card p-4">
+        <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Auto-XIC from analyte library
+            </div>
+            <div className="mt-0.5 text-xs text-muted-foreground">
+              Pick compounds — m/z is computed from formula + adduct, then EICs are extracted in one pass.
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Adduct</span>
+              <Select value={adduct} onValueChange={(v) => setAdduct(v as Adduct)}>
+                <SelectTrigger className="h-8 w-32 font-mono text-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {adductOptions.map((a) => (
+                    <SelectItem key={a} value={a} className="font-mono text-xs">
+                      {a}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex w-44 items-center gap-2">
+              <span className="text-[10px] uppercase tracking-wider text-muted-foreground">RT tol</span>
+              <Slider
+                value={[rtTol]}
+                onValueChange={(v) => setRtTol(v[0])}
+                min={0.1}
+                max={3}
+                step={0.1}
+              />
+              <span className="w-8 text-right font-mono text-[10px]">{rtTol.toFixed(1)}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-3 flex flex-wrap gap-1.5">
+          {libraryTargets.length === 0 ? (
+            <div className="text-xs text-muted-foreground">
+              No analytes in library. Run the seed SQL to add common compounds.
+            </div>
+          ) : (
+            libraryTargets.map((t) => {
+              const checked = enabledIds.has(t.id);
+              return (
+                <label
+                  key={t.id}
+                  className={`flex cursor-pointer items-center gap-1.5 rounded-md border px-2 py-1 text-xs ${
+                    checked ? "border-primary bg-primary/10" : "border-border"
+                  }`}
+                >
+                  <Checkbox
+                    checked={checked}
+                    onCheckedChange={(v) => {
+                      const next = new Set(enabledIds);
+                      if (v) next.add(t.id);
+                      else next.delete(t.id);
+                      setEnabledIds(next);
+                    }}
+                  />
+                  <span>{t.name}</span>
+                  <span className="font-mono text-[10px] text-muted-foreground">
+                    {t.mz.toFixed(4)}
+                  </span>
+                </label>
+              );
+            })
+          )}
+        </div>
+
+        {!run.scansBlobPath ? (
+          <div className="flex items-center gap-2 rounded-md border border-border bg-muted/30 p-3 text-xs text-muted-foreground">
+            <Activity className="h-3.5 w-3.5" /> Auto-XIC unavailable: this run has no persisted scans blob.
+          </div>
+        ) : activeTargets.length === 0 ? (
+          <div className="rounded-md border border-dashed border-border p-6 text-center text-xs text-muted-foreground">
+            Select one or more analytes to overlay their EICs.
+          </div>
+        ) : batchQuery.isLoading ? (
+          <div className="p-6 text-center text-xs text-muted-foreground">Extracting {activeTargets.length} EICs…</div>
+        ) : overlayRuns.length > 0 ? (
+          <>
+            <ChromatogramPlot runs={overlayRuns} height={260} channel="tic" />
+            <div className="mt-3 overflow-x-auto rounded-md border border-border">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead className="text-[10px] uppercase tracking-wider">Analyte</TableHead>
+                    <TableHead className="text-[10px] uppercase tracking-wider">Formula</TableHead>
+                    <TableHead className="text-[10px] uppercase tracking-wider">m/z</TableHead>
+                    <TableHead className="text-[10px] uppercase tracking-wider">RT obs</TableHead>
+                    <TableHead className="text-[10px] uppercase tracking-wider">RT exp</TableHead>
+                    <TableHead className="text-[10px] uppercase tracking-wider">ΔRT</TableHead>
+                    <TableHead className="text-[10px] uppercase tracking-wider">Intensity</TableHead>
+                    <TableHead className="text-[10px] uppercase tracking-wider">Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {matchRows.map(({ tr, t, dRt, matched }) => (
+                    <TableRow key={tr.id} className="text-xs">
+                      <TableCell className="font-medium">{t?.name ?? "—"}</TableCell>
+                      <TableCell className="font-mono text-muted-foreground">{t?.formula ?? "—"}</TableCell>
+                      <TableCell className="font-mono">{tr.mz.toFixed(4)}</TableCell>
+                      <TableCell className="font-mono">
+                        {tr.peakRt != null ? tr.peakRt.toFixed(2) : "—"}
+                      </TableCell>
+                      <TableCell className="font-mono text-muted-foreground">
+                        {t?.rtExpected.toFixed(2) ?? "—"}
+                      </TableCell>
+                      <TableCell className="font-mono">
+                        {dRt != null ? dRt.toFixed(2) : "—"}
+                      </TableCell>
+                      <TableCell className="font-mono">
+                        {tr.peakIntensity > 0
+                          ? tr.peakIntensity >= 1000
+                            ? `${(tr.peakIntensity / 1000).toFixed(1)}k`
+                            : tr.peakIntensity.toFixed(0)
+                          : "—"}
+                      </TableCell>
+                      <TableCell>
+                        {tr.peakIntensity <= 0 ? (
+                          <Badge variant="outline" className="text-[10px]">no peak</Badge>
+                        ) : matched ? (
+                          <Badge className="bg-[color:var(--peak-annotated)]/20 text-[10px] text-[color:var(--peak-annotated)]">
+                            match
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-[10px]">drift</Badge>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </>
+        ) : null}
       </Card>
 
       <Card className="border-border bg-card p-4">
