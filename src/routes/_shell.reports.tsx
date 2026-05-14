@@ -122,14 +122,24 @@ function Reports() {
             Compose PDF reports from method parameters, chromatograms and peak tables.
           </p>
         </div>
-        <Button onClick={generate} disabled={busy || !method}>
-          {busy ? (
-            <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
-          ) : (
-            <Download className="mr-1 h-3.5 w-3.5" />
+        <div className="flex flex-col items-end gap-1">
+          <Button onClick={generate} disabled={busy || !method}>
+            {busy ? (
+              <Loader2 className="mr-1 h-3.5 w-3.5 animate-spin" />
+            ) : (
+              <Download className="mr-1 h-3.5 w-3.5" />
+            )}
+            {busy ? "Generating…" : "Generate PDF"}
+          </Button>
+          {!method && (
+            <div className="text-[10px] text-muted-foreground">Select a method first.</div>
           )}
-          {busy ? "Generating…" : "Generate PDF"}
-        </Button>
+          {method && !methodRun && (
+            <div className="text-[10px] text-[color:var(--status-warn)]">
+              No run is linked to this method — chromatogram & peaks will be omitted.
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
