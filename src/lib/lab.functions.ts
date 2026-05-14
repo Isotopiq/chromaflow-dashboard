@@ -170,7 +170,7 @@ export const addAnalyte = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => AnalyteInput.parse(d))
   .handler(async ({ data, context }) => {
-    const { supabase, userId } = context as any;
+    const { userId } = context as any;
     let mz = data.mz ?? null;
     if (mz == null || mz <= 0) {
       const computed = data.formula ? mzFromFormula(data.formula, "[M+H]+") : null;
@@ -179,7 +179,7 @@ export const addAnalyte = createServerFn({ method: "POST" })
       }
       mz = computed;
     }
-    const { data: saved, error } = await supabase
+    const { data: saved, error } = await supabaseAdmin
       .from("analytes")
       .insert({
         name: data.name,
@@ -203,9 +203,9 @@ export const updateAnalyte = createServerFn({ method: "POST" })
     const { userId } = context as any;
     const [{ data: existing, error: fErr }, { data: roles }] = await Promise.all([
       supabaseAdmin
-      .from("analytes")
-      .select("id, created_by, library_source")
-      .eq("id", data.id)
+        .from("analytes")
+        .select("id, created_by, library_source")
+        .eq("id", data.id)
         .maybeSingle(),
       supabaseAdmin.from("user_roles").select("role").eq("user_id", userId),
     ]);
@@ -245,9 +245,9 @@ export const deleteAnalyte = createServerFn({ method: "POST" })
     const { userId } = context as any;
     const [{ data: existing, error: fErr }, { data: roles }] = await Promise.all([
       supabaseAdmin
-      .from("analytes")
-      .select("id, created_by, library_source")
-      .eq("id", data.id)
+        .from("analytes")
+        .select("id, created_by, library_source")
+        .eq("id", data.id)
         .maybeSingle(),
       supabaseAdmin.from("user_roles").select("role").eq("user_id", userId),
     ]);
