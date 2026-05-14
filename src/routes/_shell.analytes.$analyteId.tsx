@@ -1,4 +1,4 @@
-import { createFileRoute, Link, notFound } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo } from "react";
 import { useLab } from "@/lib/store";
 import { Card } from "@/components/ui/card";
@@ -17,6 +17,25 @@ function AnalyteDetail() {
   const { analytes, runs, columns } = useLab();
   const analyte = analytes.find((a) => a.id === analyteId);
 
+  const matchingRuns = useMemo(
+    () =>
+      analyte
+        ? runs.filter((r) =>
+            r.peaks.some(
+              (p) => p.analyteId === analyte.id || p.analyteName === analyte.name,
+            ),
+          )
+        : [],
+    [runs, analyte],
+  );
+  const columnsSeen = useMemo(() => {
+    const set = new Set<string>();
+    for (const r of matchingRuns) if (r.columnId) set.add(r.columnId);
+    return Array.from(set)
+      .map((id) => columns.find((c) => c.id === id))
+      .filter(Boolean) as typeof columns;
+  }, [matchingRuns, columns]);
+
   if (!analyte) {
     return (
       <div className="p-6">
@@ -29,23 +48,6 @@ function AnalyteDetail() {
       </div>
     );
   }
-
-  const matchingRuns = useMemo(
-    () =>
-      runs.filter((r) =>
-        r.peaks.some(
-          (p) => p.analyteId === analyte.id || p.analyteName === analyte.name,
-        ),
-      ),
-    [runs, analyte],
-  );
-  const columnsSeen = useMemo(() => {
-    const set = new Set<string>();
-    for (const r of matchingRuns) if (r.columnId) set.add(r.columnId);
-    return Array.from(set)
-      .map((id) => columns.find((c) => c.id === id))
-      .filter(Boolean) as typeof columns;
-  }, [matchingRuns, columns]);
 
   const mass = analyte.formula ? monoisotopicMass(analyte.formula) : null;
   const mzPos = analyte.formula ? mzFromFormula(analyte.formula, "[M+H]+") : null;
