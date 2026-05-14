@@ -84,9 +84,37 @@ export function ChromatogramPlot({
     : [];
 
   return (
-    <div style={{ width: "100%", height }}>
+    <div style={{ width: "100%", height, cursor: onSelectRange ? "crosshair" : undefined }}>
       <ResponsiveContainer>
-        <LineChart margin={{ top: 8, right: 12, left: compact ? -16 : 0, bottom: 0 }}>
+        <LineChart
+          margin={{ top: 8, right: 12, left: compact ? -16 : 0, bottom: 0 }}
+          onMouseDown={(e: any) => {
+            if (!onSelectRange) return;
+            if (e?.activeLabel == null) return;
+            setDragStart(Number(e.activeLabel));
+            setDragEnd(Number(e.activeLabel));
+          }}
+          onMouseMove={(e: any) => {
+            if (!onSelectRange || dragStart == null) return;
+            if (e?.activeLabel == null) return;
+            setDragEnd(Number(e.activeLabel));
+          }}
+          onMouseUp={() => {
+            if (!onSelectRange) return;
+            if (dragStart != null && dragEnd != null && dragStart !== dragEnd) {
+              onSelectRange(
+                Math.min(dragStart, dragEnd),
+                Math.max(dragStart, dragEnd),
+              );
+            }
+            setDragStart(null);
+            setDragEnd(null);
+          }}
+          onMouseLeave={() => {
+            setDragStart(null);
+            setDragEnd(null);
+          }}
+        >
           <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
           <XAxis
             dataKey="time"
