@@ -24,7 +24,8 @@ import { ChromatogramPlot } from "@/components/chromatogram-plot";
 import { PeakTable } from "@/components/peak-table";
 import { ago } from "@/lib/mock-data";
 import { toast } from "sonner";
-import { getRunEIC, getRunEICBatch, deleteRun } from "@/lib/lab.functions";
+import { getRunEIC, getRunEICBatch, deleteRun, addManualPeak } from "@/lib/lab.functions";
+import { integrateBand, type IntegrationResult } from "@/lib/peak-math";
 import { mzFromFormula, defaultAdduct, ADDUCTS_POS, ADDUCTS_NEG, type Adduct } from "@/lib/chem";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
