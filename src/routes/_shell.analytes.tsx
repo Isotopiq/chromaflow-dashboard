@@ -225,11 +225,16 @@ function LibraryTab() {
                               title={`Edit ${a.name}`}
                               initial={a}
                               onSubmit={async (vals) => {
-                                const saved = await updateFn({ data: { ...vals, id: a.id } });
-                                updateLocal(saved);
-                                qc.invalidateQueries({ queryKey: ["lab"] });
-                                toast.success(`Updated ${saved.name}`);
-                                setEditing(null);
+                                try {
+                                  const saved = await updateFn({ data: { ...vals, id: a.id } });
+                                  updateLocal(saved);
+                                  qc.invalidateQueries({ queryKey: ["lab"] });
+                                  toast.success(`Updated ${saved.name}`);
+                                  setEditing(null);
+                                } catch (e: any) {
+                                  toast.error(e?.message ?? "Failed to update compound");
+                                  throw e;
+                                }
                               }}
                             />
                           )}
