@@ -232,21 +232,25 @@ export function AnalyteComparePanel({
   return (
     <div className="grid gap-4 lg:grid-cols-[300px_1fr]">
       <Card className="border-border bg-card p-3">
-        <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
-          Analyte
-        </div>
-        <Select value={analyteId} onValueChange={setAnalyteId}>
-          <SelectTrigger className="mt-2 h-8 text-xs">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {analytes.map((a) => (
-              <SelectItem key={a.id} value={a.id}>
-                {a.name} · {a.mz.toFixed(4)}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!hideAnalytePicker && (
+          <>
+            <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+              Analyte
+            </div>
+            <Select value={analyteId} onValueChange={setAnalyteId}>
+              <SelectTrigger className="mt-2 h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {analytes.map((a) => (
+                  <SelectItem key={a.id} value={a.id}>
+                    {a.name} · {a.mz.toFixed(4)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </>
+        )}
 
         <div className="mt-3 grid grid-cols-2 gap-2">
           <div>
