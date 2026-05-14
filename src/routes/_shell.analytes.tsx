@@ -174,7 +174,15 @@ function LibraryTab() {
                 const isUser = a.librarySource === "user";
                 return (
                   <TableRow key={a.id} className="text-xs">
-                    <TableCell className="font-medium">{a.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <Link
+                        to="/analytes/$analyteId"
+                        params={{ analyteId: a.id }}
+                        className="hover:underline hover:text-primary"
+                      >
+                        {a.name}
+                      </Link>
+                    </TableCell>
                     <TableCell className="font-mono text-muted-foreground">
                       {a.formula || "—"}
                     </TableCell>
