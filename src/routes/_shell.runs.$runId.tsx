@@ -62,13 +62,14 @@ function RunDetail() {
   const method = methods.find((m) => m.id === run.methodId);
   const column = columns.find((c) => c.id === run.columnId);
   const [selectedId, setSelected] = useState<string | undefined>(run.peaks[0]?.id);
+  const [selectedTargetId, setSelectedTargetId] = useState<string | undefined>(undefined);
+  const [selectedTargetName, setSelectedTargetName] = useState<string | undefined>(undefined);
   const [annotation, setAnnotation] = useState("");
   const [ppm, setPpm] = useState(10);
   const [customMz, setCustomMz] = useState("");
 
   const selected = run.peaks.find((p) => p.id === selectedId);
   // Custom m/z (when typed and valid) ALWAYS overrides the selected peak.
-  // parseFloat("") and parseFloat("abc") return NaN — we filter those out.
   const customMzNum = customMz.trim() ? parseFloat(customMz) : NaN;
   const eicMz: number | null = Number.isFinite(customMzNum)
     ? customMzNum
@@ -77,9 +78,11 @@ function RunDetail() {
       : null;
 
   const fetchEIC = useServerFn(getRunEIC);
+  // Skip fetching when we already have this trace from the batch query (analyte click).
+  const hasBatchTrace = !!selectedTargetId;
   const eicQuery = useQuery({
     queryKey: ["eic", run.id, eicMz, ppm],
-    enabled: eicMz != null && Number.isFinite(eicMz) && !!run.scansBlobPath,
+    enabled: !hasBatchTrace && eicMz != null && Number.isFinite(eicMz) && !!run.scansBlobPath,
     queryFn: () => fetchEIC({ data: { runId: run.id, mz: eicMz!, ppm } }),
     staleTime: 60_000,
   });
