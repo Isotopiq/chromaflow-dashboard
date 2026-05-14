@@ -14,6 +14,7 @@ import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ShellRouteImport } from './routes/_shell'
 import { Route as ShellIndexRouteImport } from './routes/_shell.index'
+import { Route as SharedTokenRouteImport } from './routes/shared.$token'
 import { Route as ShellReportsRouteImport } from './routes/_shell.reports'
 import { Route as ShellOverlayRouteImport } from './routes/_shell.overlay'
 import { Route as ShellBatchesRouteImport } from './routes/_shell.batches'
@@ -52,6 +53,11 @@ const ShellIndexRoute = ShellIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => ShellRoute,
+} as any)
+const SharedTokenRoute = SharedTokenRouteImport.update({
+  id: '/shared/$token',
+  path: '/shared/$token',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ShellReportsRoute = ShellReportsRouteImport.update({
   id: '/reports',
@@ -134,6 +140,7 @@ export interface FileRoutesByFullPath {
   '/batches': typeof ShellBatchesRoute
   '/overlay': typeof ShellOverlayRoute
   '/reports': typeof ShellReportsRoute
+  '/shared/$token': typeof SharedTokenRoute
   '/columns/$columnId': typeof ShellColumnsColumnIdRoute
   '/methods/$methodId': typeof ShellMethodsMethodIdRoute
   '/methods/compare': typeof ShellMethodsCompareRoute
@@ -153,6 +160,7 @@ export interface FileRoutesByTo {
   '/batches': typeof ShellBatchesRoute
   '/overlay': typeof ShellOverlayRoute
   '/reports': typeof ShellReportsRoute
+  '/shared/$token': typeof SharedTokenRoute
   '/': typeof ShellIndexRoute
   '/columns/$columnId': typeof ShellColumnsColumnIdRoute
   '/methods/$methodId': typeof ShellMethodsMethodIdRoute
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/_shell/batches': typeof ShellBatchesRoute
   '/_shell/overlay': typeof ShellOverlayRoute
   '/_shell/reports': typeof ShellReportsRoute
+  '/shared/$token': typeof SharedTokenRoute
   '/_shell/': typeof ShellIndexRoute
   '/_shell/columns/$columnId': typeof ShellColumnsColumnIdRoute
   '/_shell/methods/$methodId': typeof ShellMethodsMethodIdRoute
@@ -198,6 +207,7 @@ export interface FileRouteTypes {
     | '/batches'
     | '/overlay'
     | '/reports'
+    | '/shared/$token'
     | '/columns/$columnId'
     | '/methods/$methodId'
     | '/methods/compare'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/batches'
     | '/overlay'
     | '/reports'
+    | '/shared/$token'
     | '/'
     | '/columns/$columnId'
     | '/methods/$methodId'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '/_shell/batches'
     | '/_shell/overlay'
     | '/_shell/reports'
+    | '/shared/$token'
     | '/_shell/'
     | '/_shell/columns/$columnId'
     | '/_shell/methods/$methodId'
@@ -255,6 +267,7 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
+  SharedTokenRoute: typeof SharedTokenRoute
   ApiPublicConfigRoute: typeof ApiPublicConfigRoute
 }
 
@@ -294,6 +307,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof ShellIndexRouteImport
       parentRoute: typeof ShellRoute
+    }
+    '/shared/$token': {
+      id: '/shared/$token'
+      path: '/shared/$token'
+      fullPath: '/shared/$token'
+      preLoaderRoute: typeof SharedTokenRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_shell/reports': {
       id: '/_shell/reports'
@@ -437,6 +457,7 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
+  SharedTokenRoute: SharedTokenRoute,
   ApiPublicConfigRoute: ApiPublicConfigRoute,
 }
 export const routeTree = rootRouteImport

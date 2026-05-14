@@ -634,6 +634,98 @@ export const createShareLink = createServerFn({ method: "POST" })
     return { token: row.token, expiresAt: row.expires_at };
   });
 
+// ---- Public share resource (no auth; uses admin client; expiry-checked) ----
+export const getSharedResource = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ token: z.string().min(8).max(80) }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: link, error } = await supabaseAdmin
+      .from("shared_links")
+      .select("*")
+      .eq("token", data.token)
+      .maybeSingle();
+    if (error) throw error;
+    if (!link) throw new Error("Link not found");
+    if (link.expires_at && new Date(link.expires_at).getTime() < Date.now()) {
+      throw new Error("Link has expired");
+    }
+
+    if (link.resource_kind === "report") {
+      const { data: report, error: re } = await supabaseAdmin
+        .from("reports")
+        .select("id, title, template, storage_path, created_at")
+        .eq("id", link.resource_id)
+        .maybeSingle();
+      if (re) throw re;
+      if (!report) throw new Error("Report not found");
+      const { data: signed, error: se } = await supabaseAdmin.storage
+        .from("reports")
+        .createSignedUrl(report.storage_path, 60 * 10);
+      if (se) throw se;
+      return {
+        kind: "report" as const,
+        title: report.title,
+        template: report.template,
+        createdAt: report.created_at,
+        url: signed.signedUrl,
+      };
+    }
+
+    // run
+    const { data: run, error: rErr } = await supabaseAdmin
+      .from("runs")
+      .select("*")
+      .eq("id", link.resource_id)
+      .maybeSingle();
+    if (rErr) throw rErr;
+    if (!run) throw new Error("Run not found");
+    const { data: peaks } = await supabaseAdmin
+      .from("peaks")
+      .select("*")
+      .eq("run_id", run.id);
+    return {
+      kind: "run" as const,
+      run: mapRun(run, (peaks ?? []).map(mapPeak).sort((a, b) => a.rt - b.rt)),
+    };
+  });
+
+// ---- Audit log (admin) ----
+const AuditFilters = z.object({
+  table: z.string().max(80).optional(),
+  action: z.enum(["insert", "update", "delete"]).optional(),
+  actorId: z.string().uuid().optional(),
+  since: z.string().optional(),
+  until: z.string().optional(),
+  limit: z.number().int().min(1).max(200).default(200),
+});
+export const listAuditEvents = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => AuditFilters.parse(d ?? {}))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+    const { data: roles } = await supabase
+      .from("user_roles")
+      .select("role")
+      .eq("user_id", userId);
+    const isAdmin = (roles ?? []).some((r: any) => r.role === "admin");
+    if (!isAdmin) throw new Response("Forbidden", { status: 403 });
+
+    let q = supabase
+      .from("audit_events")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(data.limit);
+    if (data.table) q = q.eq("table_name", data.table);
+    if (data.action) q = q.eq("action", data.action);
+    if (data.actorId) q = q.eq("actor_id", data.actorId);
+    if (data.since) q = q.gte("created_at", data.since);
+    if (data.until) q = q.lte("created_at", data.until);
+
+    const { data: rows, error } = await q;
+    if (error) throw error;
+    return rows ?? [];
+  });
+
 // ---- Auto-annotate batch ----
 const AutoAnnotateInput = z.object({
   batchId: z.string().uuid(),
