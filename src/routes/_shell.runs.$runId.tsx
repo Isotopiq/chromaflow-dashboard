@@ -68,6 +68,10 @@ function RunDetail() {
   const [annotation, setAnnotation] = useState("");
   const [ppm, setPpm] = useState(10);
   const [customMz, setCustomMz] = useState("");
+  const [integrateMode, setIntegrateMode] = useState(false);
+  const [integration, setIntegration] = useState<IntegrationResult | null>(null);
+  const addPeakLocal = useLab((s) => s.addPeakLocal);
+  const addManualPeakFn = useServerFn(addManualPeak);
 
   const selected = run.peaks.find((p) => p.id === selectedId);
   // Custom m/z (when typed and valid) ALWAYS overrides the selected peak.
