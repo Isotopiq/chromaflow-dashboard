@@ -22,6 +22,7 @@ export type Peak = {
   analyteId?: string;
   analyteName?: string;
   confidence?: number;
+  manual?: boolean;
 };
 
 export type Run = {
