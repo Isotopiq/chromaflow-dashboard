@@ -7,8 +7,11 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceDot,
+  ReferenceArea,
+  ReferenceLine,
   Legend,
 } from "recharts";
+import { useState } from "react";
 import type { Run, Peak } from "@/lib/mock-data";
 
 const TRACE_COLORS = [
@@ -28,6 +31,12 @@ type Props = {
   showPeaks?: boolean;
   channel?: "tic" | "bpc";
   compact?: boolean;
+  /** When set, draw a shaded vertical band between these RT values. */
+  selectionBand?: { x1: number; x2: number } | null;
+  /** Optional dotted baseline points across the band. */
+  baseline?: { x1: number; y1: number; x2: number; y2: number } | null;
+  /** Enable click-drag selection. Receives the selected [x1, x2]. */
+  onSelectRange?: (x1: number, x2: number) => void;
 };
 
 export function ChromatogramPlot({
@@ -36,7 +45,12 @@ export function ChromatogramPlot({
   showPeaks = false,
   channel = "tic",
   compact = false,
+  selectionBand = null,
+  baseline = null,
+  onSelectRange,
 }: Props) {
+  const [dragStart, setDragStart] = useState<number | null>(null);
+  const [dragEnd, setDragEnd] = useState<number | null>(null);
   if (runs.length === 0) return null;
 
   // Each run carries its own x/y dataset — Line accepts its own `data` prop,
@@ -70,9 +84,37 @@ export function ChromatogramPlot({
     : [];
 
   return (
-    <div style={{ width: "100%", height }}>
+    <div style={{ width: "100%", height, cursor: onSelectRange ? "crosshair" : undefined }}>
       <ResponsiveContainer>
-        <LineChart margin={{ top: 8, right: 12, left: compact ? -16 : 0, bottom: 0 }}>
+        <LineChart
+          margin={{ top: 8, right: 12, left: compact ? -16 : 0, bottom: 0 }}
+          onMouseDown={(e: any) => {
+            if (!onSelectRange) return;
+            if (e?.activeLabel == null) return;
+            setDragStart(Number(e.activeLabel));
+            setDragEnd(Number(e.activeLabel));
+          }}
+          onMouseMove={(e: any) => {
+            if (!onSelectRange || dragStart == null) return;
+            if (e?.activeLabel == null) return;
+            setDragEnd(Number(e.activeLabel));
+          }}
+          onMouseUp={() => {
+            if (!onSelectRange) return;
+            if (dragStart != null && dragEnd != null && dragStart !== dragEnd) {
+              onSelectRange(
+                Math.min(dragStart, dragEnd),
+                Math.max(dragStart, dragEnd),
+              );
+            }
+            setDragStart(null);
+            setDragEnd(null);
+          }}
+          onMouseLeave={() => {
+            setDragStart(null);
+            setDragEnd(null);
+          }}
+        >
           <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" vertical={false} />
           <XAxis
             dataKey="time"
@@ -143,6 +185,35 @@ export function ChromatogramPlot({
               isFront
             />
           ))}
+          {selectionBand && (
+            <ReferenceArea
+              x1={selectionBand.x1}
+              x2={selectionBand.x2}
+              fill="var(--primary)"
+              fillOpacity={0.12}
+              stroke="var(--primary)"
+              strokeOpacity={0.4}
+            />
+          )}
+          {dragStart != null && dragEnd != null && dragStart !== dragEnd && (
+            <ReferenceArea
+              x1={Math.min(dragStart, dragEnd)}
+              x2={Math.max(dragStart, dragEnd)}
+              fill="var(--primary)"
+              fillOpacity={0.18}
+            />
+          )}
+          {baseline && (
+            <ReferenceLine
+              segment={[
+                { x: baseline.x1, y: baseline.y1 },
+                { x: baseline.x2, y: baseline.y2 },
+              ]}
+              stroke="var(--peak-annotated)"
+              strokeDasharray="3 3"
+              ifOverflow="extendDomain"
+            />
+          )}
         </LineChart>
       </ResponsiveContainer>
     </div>

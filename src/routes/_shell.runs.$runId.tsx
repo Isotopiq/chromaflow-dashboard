@@ -24,7 +24,8 @@ import { ChromatogramPlot } from "@/components/chromatogram-plot";
 import { PeakTable } from "@/components/peak-table";
 import { ago } from "@/lib/mock-data";
 import { toast } from "sonner";
-import { getRunEIC, getRunEICBatch, deleteRun } from "@/lib/lab.functions";
+import { getRunEIC, getRunEICBatch, deleteRun, addManualPeak } from "@/lib/lab.functions";
+import { integrateBand, type IntegrationResult } from "@/lib/peak-math";
 import { mzFromFormula, defaultAdduct, ADDUCTS_POS, ADDUCTS_NEG, type Adduct } from "@/lib/chem";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -67,6 +68,10 @@ function RunDetail() {
   const [annotation, setAnnotation] = useState("");
   const [ppm, setPpm] = useState(10);
   const [customMz, setCustomMz] = useState("");
+  const [integrateMode, setIntegrateMode] = useState(false);
+  const [integration, setIntegration] = useState<IntegrationResult | null>(null);
+  const addPeakLocal = useLab((s) => s.addPeakLocal);
+  const addManualPeakFn = useServerFn(addManualPeak);
 
   const selected = run.peaks.find((p) => p.id === selectedId);
   // Custom m/z (when typed and valid) ALWAYS overrides the selected peak.
@@ -555,7 +560,85 @@ function RunDetail() {
         ) : eicQuery.isLoading ? (
           <div className="p-6 text-center text-xs text-muted-foreground">Extracting EIC…</div>
         ) : eicTrace ? (
-          <ChromatogramPlot runs={[eicTrace]} height={220} channel="tic" />
+          <>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <div className="flex items-center gap-2 text-[10px] uppercase tracking-wider text-muted-foreground">
+                <button
+                  onClick={() => setIntegrateMode(false)}
+                  className={`rounded-md border px-2 py-1 ${!integrateMode ? "border-primary bg-primary/10 text-primary" : "border-border"}`}
+                >
+                  Auto
+                </button>
+                <button
+                  onClick={() => setIntegrateMode(true)}
+                  className={`rounded-md border px-2 py-1 ${integrateMode ? "border-primary bg-primary/10 text-primary" : "border-border"}`}
+                >
+                  Integrate (drag)
+                </button>
+              </div>
+              {integration && (
+                <div className="flex flex-wrap items-center gap-3 font-mono text-[10px] text-muted-foreground">
+                  <span>RT [{integration.rtStart.toFixed(2)}, {integration.rtEnd.toFixed(2)}]</span>
+                  <span>apex {integration.apexRt.toFixed(2)}</span>
+                  <span>height {integration.height.toFixed(0)}</span>
+                  <span>area {integration.area.toFixed(0)}</span>
+                  <span>FWHM {integration.fwhm.toFixed(3)}</span>
+                  <span>S/N {integration.sn.toFixed(1)}</span>
+                  <Button size="sm" variant="outline" onClick={() => setIntegration(null)}>Reset</Button>
+                  <Button
+                    size="sm"
+                    onClick={async () => {
+                      try {
+                        const { peak } = await addManualPeakFn({
+                          data: {
+                            runId: run.id,
+                            rt: integration.apexRt,
+                            rtStart: integration.rtStart,
+                            rtEnd: integration.rtEnd,
+                            area: integration.area,
+                            height: integration.height,
+                            fwhm: integration.fwhm,
+                            sn: integration.sn,
+                            mz: eicMz ?? null,
+                            mzLow: eicMz != null ? eicMz - (eicMz * ppm) / 1e6 : null,
+                            mzHigh: eicMz != null ? eicMz + (eicMz * ppm) / 1e6 : null,
+                            analyteName: selectedTargetName ?? null,
+                          },
+                        });
+                        addPeakLocal(run.id, peak);
+                        toast.success("Manual peak saved");
+                        setIntegration(null);
+                        setIntegrateMode(false);
+                      } catch (e: any) {
+                        toast.error(e?.message ?? "Failed to save peak");
+                      }
+                    }}
+                  >
+                    Save as peak
+                  </Button>
+                </div>
+              )}
+            </div>
+            <ChromatogramPlot
+              runs={[eicTrace]}
+              height={220}
+              channel="tic"
+              onSelectRange={
+                integrateMode
+                  ? (a, b) => {
+                      const r = integrateBand(eicTrace.trace.x, eicTrace.trace.tic, a, b);
+                      if (r) setIntegration(r);
+                    }
+                  : undefined
+              }
+              selectionBand={integration ? { x1: integration.rtStart, x2: integration.rtEnd } : null}
+              baseline={
+                integration
+                  ? { x1: integration.rtStart, y1: integration.baselineLeft, x2: integration.rtEnd, y2: integration.baselineRight }
+                  : null
+              }
+            />
+          </>
         ) : null}
       </Card>
 

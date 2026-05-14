@@ -687,6 +687,63 @@ export const autoAnnotateBatch = createServerFn({ method: "POST" })
     return { annotated, scanned: peaks?.length ?? 0 };
   });
 
+// ---- Manual peak integration ----
+const ManualPeakInput = z.object({
+  runId: z.string().uuid(),
+  rt: z.number(),
+  rtStart: z.number(),
+  rtEnd: z.number(),
+  area: z.number().min(0),
+  height: z.number().min(0),
+  fwhm: z.number().min(0),
+  sn: z.number().min(0),
+  mz: z.number().nullable().optional(),
+  mzLow: z.number().nullable().optional(),
+  mzHigh: z.number().nullable().optional(),
+  analyteId: z.string().uuid().nullable().optional(),
+  analyteName: z.string().max(200).nullable().optional(),
+});
+export const addManualPeak = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => ManualPeakInput.parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context as any;
+    const { data: run, error: rErr } = await supabase
+      .from("runs")
+      .select("id, uploaded_by")
+      .eq("id", data.runId)
+      .maybeSingle();
+    if (rErr) throw rErr;
+    if (!run) throw new Error("Run not found");
+    if (run.uploaded_by && run.uploaded_by !== userId) {
+      throw new Error("You don't have permission to add peaks to this run.");
+    }
+    const hasAnalyte = !!(data.analyteId || data.analyteName);
+    const { data: row, error } = await supabase
+      .from("peaks")
+      .insert({
+        run_id: data.runId,
+        rt: data.rt,
+        area: data.area,
+        height: data.height,
+        fwhm: data.fwhm,
+        sn: data.sn,
+        mz: data.mz ?? null,
+        mz_low: data.mzLow ?? null,
+        mz_high: data.mzHigh ?? null,
+        analyte_id: data.analyteId ?? null,
+        analyte_name: data.analyteName ?? null,
+        annotated_by: hasAnalyte ? userId : null,
+        annotation_source: hasAnalyte ? "manual" : null,
+        confidence: hasAnalyte ? 1 : null,
+        manual: true,
+      })
+      .select()
+      .single();
+    if (error) throw error;
+    return { peak: mapPeak(row) };
+  });
+
 // ---- Delete a run (and its storage objects + child rows) ----
 async function deleteRunInternal(supabase: any, userId: string, runId: string) {
   const { data: run, error: fetchErr } = await supabase
