@@ -428,7 +428,18 @@ function CompoundFormDialog({
           </div>
         </div>
       </div>
-      <DialogFooter>
+      <DialogFooter className="flex-col items-stretch gap-2 sm:flex-row sm:items-center sm:justify-end">
+        {!canSave && !busy && (
+          <div className="text-[10px] text-muted-foreground sm:mr-auto">
+            {!name.trim()
+              ? "Name required."
+              : !Number.isFinite(rtNum) || rtNum < 0 || rtNum > 120
+                ? "Expected RT must be 0–120 min."
+                : mzPos == null && !hasMz
+                  ? "Provide a valid molecular formula or a manual m/z."
+                  : ""}
+          </div>
+        )}
         <Button onClick={submit} disabled={!canSave}>
           {busy ? "Saving…" : "Save"}
         </Button>
