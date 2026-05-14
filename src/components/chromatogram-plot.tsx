@@ -7,8 +7,11 @@ import {
   CartesianGrid,
   Tooltip,
   ReferenceDot,
+  ReferenceArea,
+  ReferenceLine,
   Legend,
 } from "recharts";
+import { useState } from "react";
 import type { Run, Peak } from "@/lib/mock-data";
 
 const TRACE_COLORS = [
