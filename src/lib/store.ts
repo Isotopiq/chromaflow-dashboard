@@ -29,6 +29,7 @@ type State = {
   }) => void;
   upsertMethodLocal: (m: Method) => void;
   upsertColumnLocal: (c: Column) => void;
+  removeColumnLocal: (id: string) => void;
   upsertBatchLocal: (b: Batch) => void;
   upsertRunLocal: (r: Run) => void;
   addAnalyteLocal: (a: Analyte) => void;
@@ -71,6 +72,8 @@ export const useLab = create<State>((set) => ({
         ? s.columns.map((x) => (x.id === c.id ? c : x))
         : [c, ...s.columns],
     })),
+  removeColumnLocal: (id) =>
+    set((s) => ({ columns: s.columns.filter((c) => c.id !== id) })),
   upsertBatchLocal: (b) =>
     set((s) => ({
       batches: s.batches.some((x) => x.id === b.id)
