@@ -134,6 +134,34 @@ export const upsertColumn = createServerFn({ method: "POST" })
     return mapColumn(saved);
   });
 
+export const deleteColumn = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { userId } = context as any;
+    const [{ data: existing, error: fErr }, { data: roles }, { data: methodRefs }, { data: runRefs }] =
+      await Promise.all([
+        supabaseAdmin.from("columns").select("id, owner_id").eq("id", data.id).maybeSingle(),
+        supabaseAdmin.from("user_roles").select("role").eq("user_id", userId),
+        supabaseAdmin.from("methods").select("id").eq("column_id", data.id).limit(1),
+        supabaseAdmin.from("runs").select("id").eq("column_id", data.id).limit(1),
+      ]);
+    if (fErr) throw fErr;
+    if (!existing) return { ok: true, missing: true };
+    const isAdmin = (roles ?? []).some((r: any) => r.role === "admin");
+    if (existing.owner_id && existing.owner_id !== userId && !isAdmin) {
+      throw new Error("You can only delete columns you own.");
+    }
+    if ((methodRefs ?? []).length > 0 || (runRefs ?? []).length > 0) {
+      throw new Error(
+        "Column is still referenced by methods or runs. Unlink them before deleting.",
+      );
+    }
+    const { error } = await supabaseAdmin.from("columns").delete().eq("id", data.id);
+    if (error) throw error;
+    return { ok: true };
+  });
+
 // ---- Batches ----
 const BatchInput = z.object({
   id: z.string().optional(),
