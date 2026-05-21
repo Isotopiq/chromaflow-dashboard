@@ -1,17 +1,14 @@
-# Easypanel-friendly compose file for CHROMA.LAB.
-# Uses port 5273 on the host (uncommon, avoids clashes with 3000/5173/8080/etc.).
-# In Easypanel: create a "Compose" service and point it at this repo —
-# Easypanel will pick up the labels and proxy your domain to port 5273.
+# Easypanel-compatible Compose file for CHROMA.LAB.
+# In Easypanel: create a "Compose" service pointed at this repo and set the
+# environment variables listed below in the service's Environment tab.
+# Easypanel injects them at container runtime, so no `:?` strict checks
+# and no build args are used here.
 
 services:
   chroma-lab:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
-        VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
-        VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID}
     image: chroma-lab:latest
     container_name: chroma-lab
     restart: unless-stopped
@@ -21,13 +18,16 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 5273
-      # Server vars default to the VITE_ equivalents so you only need to set
-      # the VITE_* trio + SUPABASE_SERVICE_ROLE_KEY in Easypanel.
-      SUPABASE_URL: ${SUPABASE_URL:-${VITE_SUPABASE_URL}}
-      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-${VITE_SUPABASE_PUBLISHABLE_KEY}}
+      # Server-side Supabase config (used by server functions / SSR)
+      SUPABASE_URL: ${SUPABASE_URL}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
       SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
-      SUPABASE_PROJECT_ID: ${SUPABASE_PROJECT_ID:-${VITE_SUPABASE_PROJECT_ID}}
-      # Optional: Lovable AI gateway key (only if you use AI features)
+      SUPABASE_PROJECT_ID: ${SUPABASE_PROJECT_ID}
+      # Client-side Supabase config (read by the browser bundle at runtime)
+      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+      VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
+      VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID}
+      # Optional: only needed if Lovable AI features are used
       LOVABLE_API_KEY: ${LOVABLE_API_KEY:-}
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:5273/"]
