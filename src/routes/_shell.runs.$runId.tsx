@@ -698,6 +698,7 @@ function RunDetail() {
                     onSelectPeak(p.id);
                   }
                 }}
+                onUnassign={usingDerivedPeaks ? undefined : handleUnassign}
               />
             )}
           </div>
