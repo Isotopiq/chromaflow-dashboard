@@ -39,6 +39,7 @@ function Reports() {
     notes: true,
   });
   const [selectedEicIds, setSelectedEicIds] = useState<Set<string>>(new Set());
+  const [customNotes, setCustomNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const printRef = useRef<HTMLDivElement | null>(null);
 
