@@ -24,6 +24,15 @@ import { renderReportPdf } from "@/lib/pdf-report";
 import { ShareDialog } from "@/components/share-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 export const Route = createFileRoute("/_shell/reports")({
   component: Reports,
