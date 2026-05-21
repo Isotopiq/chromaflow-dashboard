@@ -201,8 +201,9 @@ function Reports() {
             {(
               [
                 ["method", "Method parameters"],
-                ["chromatogram", "Chromatogram"],
+                ["chromatogram", "Chromatogram (TIC)"],
                 ["peaks", "Peak table"],
+                ["eics", "Extracted ion chromatograms"],
                 ["notes", "Notes"],
               ] as const
             ).map(([key, label]) => (
@@ -215,6 +216,76 @@ function Reports() {
               </label>
             ))}
           </div>
+
+          {sections.eics && (
+            <>
+              <div className="mt-5 flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
+                <span>EIC analytes</span>
+                <span className="font-mono normal-case tracking-normal text-muted-foreground">
+                  {selectedEicIds.size}/{eicCandidates.length}
+                </span>
+              </div>
+              {!hasScans && (
+                <div className="mt-2 rounded-md border border-border bg-muted/30 p-2 text-[10px] text-muted-foreground">
+                  Selected run has no raw scans blob — EICs can't be extracted.
+                </div>
+              )}
+              {hasScans && eicCandidates.length === 0 && (
+                <div className="mt-2 rounded-md border border-border bg-muted/30 p-2 text-[10px] text-muted-foreground">
+                  No analytes with an m/z in the library yet.
+                </div>
+              )}
+              {hasScans && eicCandidates.length > 0 && (
+                <>
+                  <div className="mt-1 flex gap-2 text-[10px]">
+                    <button
+                      type="button"
+                      className="text-primary hover:underline"
+                      onClick={() =>
+                        setSelectedEicIds(new Set(eicCandidates.map((a) => a.id)))
+                      }
+                    >
+                      Select all
+                    </button>
+                    <span className="text-muted-foreground">·</span>
+                    <button
+                      type="button"
+                      className="text-primary hover:underline"
+                      onClick={() => setSelectedEicIds(new Set())}
+                    >
+                      Clear
+                    </button>
+                  </div>
+                  <ScrollArea className="mt-2 h-56 rounded-md border border-border">
+                    <div className="space-y-1 p-2">
+                      {eicCandidates.map((a) => (
+                        <label
+                          key={a.id}
+                          className="flex cursor-pointer items-center gap-2 text-xs"
+                        >
+                          <Checkbox
+                            checked={selectedEicIds.has(a.id)}
+                            onCheckedChange={(v) =>
+                              setSelectedEicIds((prev) => {
+                                const next = new Set(prev);
+                                if (v) next.add(a.id);
+                                else next.delete(a.id);
+                                return next;
+                              })
+                            }
+                          />
+                          <span className="flex-1 truncate">{a.name}</span>
+                          <span className="font-mono text-[10px] text-muted-foreground">
+                            {a.mz.toFixed(3)}
+                          </span>
+                        </label>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </>
+              )}
+            </>
+          )}
         </Card>
 
         <Card className="border-border bg-surface-elevated p-6">
