@@ -43,7 +43,7 @@ import { useRef } from "react";
 import { toast } from "sonner";
 import { addAnalyte, updateAnalyte, deleteAnalyte } from "@/lib/lab.functions";
 import { monoisotopicMass, mzFromFormula } from "@/lib/chem";
-import type { Analyte } from "@/lib/mock-data";
+import type { Analyte } from "@/lib/lab-types";
 import {
   ScatterChart,
   Scatter,

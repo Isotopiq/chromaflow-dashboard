@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ChromatogramPlot } from "@/components/chromatogram-plot";
 import { AnalyteComparePanel } from "@/components/analyte-compare-panel";
 import { cn } from "@/lib/utils";
+import type { Method } from "@/lib/lab-types";
 
 export const Route = createFileRoute("/_shell/methods/compare")({
   component: CompareMethods,
@@ -28,8 +29,7 @@ function CompareMethods() {
   const aRun = runs.find((r) => r.methodId === aId);
   const bRun = runs.find((r) => r.methodId === bId);
 
-  type M = import("@/lib/mock-data").Method;
-  const fields: Array<[string, (m: M) => string]> = [
+  const fields: Array<[string, (m: Method) => string]> = [
     ["Modality", (m) => m.modality],
     ["Column", (m) => columns.find((c) => c.id === m.columnId)?.name ?? "—"],
     ["Mobile phase A", (m) => m.mobilePhaseA],
@@ -135,7 +135,7 @@ function MethodPicker({
   label: string;
   value: string;
   onChange: (v: string) => void;
-  methods: import("@/lib/mock-data").Method[];
+  methods: Method[];
 }) {
   return (
     <Card className="border-border bg-card p-3">
