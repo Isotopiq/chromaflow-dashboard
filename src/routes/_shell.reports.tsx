@@ -834,7 +834,7 @@ function GradientPlot({
       >
         Time (min)
       </text>
-      <path d={bPath} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.75} />
+      <path d={bPath} fill="none" stroke="var(--primary)" strokeWidth={1.75} />
       <path
         d={fPath}
         fill="none"
@@ -844,11 +844,12 @@ function GradientPlot({
         strokeDasharray="3 3"
       />
       {pts.map((p, i) => (
-        <circle key={i} cx={xOf(p.time)} cy={yB(p.pctB)} r={2} fill="hsl(var(--primary))" />
+        <circle key={i} cx={xOf(p.time)} cy={yB(p.pctB)} r={2} fill="var(--primary)" />
       ))}
       <g transform={`translate(${w - padR - 110}, ${padT + 4})`}>
         <rect width={110} height={28} fill="white" fillOpacity={0.6} rx={3} />
-        <line x1={6} x2={20} y1={10} y2={10} stroke="hsl(var(--primary))" strokeWidth={1.75} />
+        <line x1={6} x2={20} y1={10} y2={10} stroke="var(--primary)" strokeWidth={1.75} />
+
         <text x={24} y={13} fontSize="9" fill="currentColor">% B</text>
         <line
           x1={56}
