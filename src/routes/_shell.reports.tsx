@@ -459,3 +459,88 @@ function RField({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+type EicBatch = {
+  x: number[];
+  traces: Array<{
+    id: string;
+    mz: number;
+    y: number[];
+    peakRt: number | null;
+    peakIntensity: number;
+    area: number;
+    fwhm: number;
+    sn: number;
+  }>;
+};
+
+function EicReportBlock({
+  analytes,
+  data,
+}: {
+  analytes: Analyte[];
+  data: EicBatch | undefined;
+}) {
+  if (!data || data.traces.length === 0) {
+    return <div className="mt-2 text-[11px] text-muted-foreground">No EIC data.</div>;
+  }
+  const nameById = new Map(analytes.map((a) => [a.id, a.name]));
+  const overlayRuns = data.traces.map((t) => ({
+    id: t.id,
+    name: `${nameById.get(t.id) ?? "?"} · m/z ${t.mz.toFixed(3)}`,
+    trace: { x: data.x, tic: t.y, bpc: t.y },
+  }));
+  return (
+    <>
+      <div className="mt-2 rounded-md border border-border p-2">
+        <ChromatogramPlot runs={overlayRuns} height={220} />
+      </div>
+      <table className="mt-3 w-full text-[10px]">
+        <thead>
+          <tr className="border-b border-border text-left text-muted-foreground">
+            <th className="py-1 font-medium uppercase tracking-widest">Analyte</th>
+            <th className="py-1 font-mono font-medium uppercase tracking-widest">m/z</th>
+            <th className="py-1 text-right font-mono font-medium uppercase tracking-widest">
+              RT
+            </th>
+            <th className="py-1 text-right font-mono font-medium uppercase tracking-widest">
+              Height
+            </th>
+            <th className="py-1 text-right font-mono font-medium uppercase tracking-widest">
+              Area
+            </th>
+            <th className="py-1 text-right font-mono font-medium uppercase tracking-widest">
+              FWHM
+            </th>
+            <th className="py-1 text-right font-mono font-medium uppercase tracking-widest">
+              S/N
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.traces.map((t) => (
+            <tr key={t.id} className="border-b border-border/60">
+              <td className="py-1">{nameById.get(t.id) ?? "?"}</td>
+              <td className="py-1 font-mono">{t.mz.toFixed(4)}</td>
+              <td className="py-1 text-right font-mono">
+                {t.peakRt != null ? t.peakRt.toFixed(2) : "—"}
+              </td>
+              <td className="py-1 text-right font-mono">
+                {t.peakIntensity ? t.peakIntensity.toExponential(2) : "—"}
+              </td>
+              <td className="py-1 text-right font-mono">
+                {t.area ? t.area.toExponential(2) : "—"}
+              </td>
+              <td className="py-1 text-right font-mono">
+                {t.fwhm ? t.fwhm.toFixed(3) : "—"}
+              </td>
+              <td className="py-1 text-right font-mono">
+                {t.sn ? t.sn.toFixed(1) : "—"}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </>
+  );
+}
