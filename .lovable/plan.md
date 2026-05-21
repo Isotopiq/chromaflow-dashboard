@@ -1,87 +1,118 @@
-# Fix Easypanel Docker Compose deployment
+# Fix Easypanel Docker Compose deployment for good
 
-## Goal
+## Actual problem
 
-Make this app deploy cleanly as a single Easypanel Compose service and stop the current container loop:
+The build is now successful and it does create:
 
 ```text
-Cannot find module '/app/dist/server/server.js'
+dist/server/server.js
 ```
 
-## Root cause
+The remaining crash happens after the container starts:
 
-The Docker container runs:
+```text
+Error: Could not resolve entry for router entry: router in /app/src
+```
+
+This is because the runtime command is still:
 
 ```text
 vite preview --host 0.0.0.0 --port 5273
 ```
 
-That runtime expects a normal TanStack/Vite production output containing `dist/server/server.js`. The current build is still using the Cloudflare build plugin, which produces a different server bundle layout. So the image builds, but the preview server cannot find the expected server entry when the container starts.
+TanStack Start's Vite preview server re-loads `vite.config.ts` at container startup. During that config load it checks for the router source entry at `src/router.tsx`. The current runtime Docker image only copies `dist`, `package.json`, `vite.config.ts`, and `tsconfig.json`, so `/app/src/router.tsx` is missing even though the built server exists.
 
-## Plan
+## Changes to make
 
-### 1. Make the self-hosted Docker build produce the expected server output
+### 1. Dockerfile: restore the required source directory in the runtime image
 
-Update `vite.config.ts` to disable the Cloudflare build plugin for this repo’s Docker build while keeping the existing TanStack server entry:
+Add this back to the runtime stage:
 
-```ts
-export default defineConfig({
-  cloudflare: false,
-  tanstackStart: {
-    server: { entry: "server" },
-  },
-});
+```dockerfile
+COPY --from=builder /app/src ./src
 ```
 
-This is the direct fix for the missing `/app/dist/server/server.js` error.
-
-### 2. Replace the Dockerfile with a clean Easypanel-compatible production image
-
-Keep a simple multi-stage Bun image:
-
-- install dependencies
-- build the app
-- copy only `dist`, `node_modules`, `package.json`, and the small config files needed by `vite preview`
-- expose container port `5273`
-- run `bun run preview --host 0.0.0.0 --port 5273`
-
-Remove the previous workaround that copied `src/` into the runtime image. Once the build target is correct, the runtime image should not need source files.
-
-### 3. Rewrite `docker-compose.yml` in Easypanel style
-
-Use a minimal Compose service:
-
-- one service: `chroma-lab`
-- `build: .`
-- `restart: unless-stopped`
-- `ports: "5273:5273"`
-- runtime `environment:` only
-- no `build.args`
-- no strict `${VAR:?message}` interpolation, because that caused Easypanel deploy failures before
-- healthcheck against `http://127.0.0.1:5273/`
-
-### 4. Environment variables to set in Easypanel
-
-Use these runtime variables in the Easypanel service UI:
+Keep the existing `dist/server/server.js` fix in `vite.config.ts`. The final runtime image should contain both:
 
 ```text
-SUPABASE_URL=https://your-self-hosted-supabase-url
-SUPABASE_PUBLISHABLE_KEY=your-anon-or-publishable-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-SUPABASE_PROJECT_ID=selfhosted
-VITE_SUPABASE_URL=https://your-self-hosted-supabase-url
-VITE_SUPABASE_PUBLISHABLE_KEY=your-anon-or-publishable-key
-VITE_SUPABASE_PROJECT_ID=selfhosted
+/app/dist/server/server.js
+/app/src/router.tsx
 ```
 
-`LOVABLE_API_KEY` stays optional and should only be set if the app uses Lovable AI features.
+This directly fixes the current container loop.
 
-## Files to change
+### 2. Docker Compose: make it Easypanel-safe
 
-- `vite.config.ts`
-- `Dockerfile`
-- `docker-compose.yml`
+Update `docker-compose.yml` so it does not produce noisy unset-variable warnings and so it uses the environment variable names the app actually reads.
+
+The app currently reads these server-side names:
+
+```text
+LAB_SUPABASE_URL
+LAB_SUPABASE_ANON_KEY
+LAB_SUPABASE_SERVICE_ROLE_KEY
+```
+
+The Compose file should pass those through, and can also pass the standard aliases for compatibility:
+
+```text
+SUPABASE_URL
+SUPABASE_PUBLISHABLE_KEY
+SUPABASE_SERVICE_ROLE_KEY
+SUPABASE_PROJECT_ID
+```
+
+Use `${VAR:-}` defaults where interpolation remains, so Easypanel deploy logs do not warn and fail noisily when optional variables are absent.
+
+### 3. Optional compatibility guard in server config
+
+Update the server-side Supabase config to accept both naming styles:
+
+```text
+LAB_SUPABASE_URL or SUPABASE_URL
+LAB_SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEY
+LAB_SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SERVICE_ROLE_KEY
+```
+
+This prevents future deployment failures caused only by using the standard Supabase variable names in Easypanel.
 
 ## Expected result
 
-After redeploying in Easypanel, the container should start once, keep running, and serve the app on port `5273` without the missing `dist/server/server.js` error.
+After redeploying, the container should start and stay running:
+
+```text
+vite preview --host 0.0.0.0 --port 5273
+Local:   http://localhost:5273/
+Network: http://...:5273/
+```
+
+It should no longer crash with either:
+
+```text
+Cannot find module '/app/dist/server/server.js'
+```
+
+or:
+
+```text
+Could not resolve entry for router entry: router in /app/src
+```
+
+## Easypanel environment variables to set
+
+Set at least these in Easypanel:
+
+```text
+LAB_SUPABASE_URL=https://your-supabase-url
+LAB_SUPABASE_ANON_KEY=your-anon-or-publishable-key
+LAB_SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+```
+
+If you prefer the standard names, the compatibility guard will also support:
+
+```text
+SUPABASE_URL=https://your-supabase-url
+SUPABASE_PUBLISHABLE_KEY=your-anon-or-publishable-key
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+SUPABASE_PROJECT_ID=selfhosted
+```
