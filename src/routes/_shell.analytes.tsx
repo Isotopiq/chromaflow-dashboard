@@ -647,3 +647,157 @@ function MatrixTab() {
     </div>
   );
 }
+
+// ---------------------------------------------------------------------------
+// CSV import / template
+// ---------------------------------------------------------------------------
+
+const CSV_TEMPLATE = `name,formula,rt_expected,mz
+Caffeine,C8H10N4O2,3.42,
+Acetaminophen,C8H9NO2,2.10,
+Custom analyte,,5.50,250.1438
+`;
+
+function downloadCsvTemplate() {
+  const blob = new Blob([CSV_TEMPLATE], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "analyte-library-template.csv";
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+type ParsedRow = { name: string; formula: string; rtExpected: number; mz: number | null };
+
+function parseAnalyteCsv(text: string): { rows: ParsedRow[]; errors: string[] } {
+  const errors: string[] = [];
+  const rows: ParsedRow[] = [];
+  const lines = text.split(/\r?\n/).filter((l) => l.trim().length > 0);
+  if (lines.length === 0) return { rows, errors: ["File is empty."] };
+
+  const splitCsv = (line: string): string[] => {
+    const out: string[] = [];
+    let cur = "";
+    let inQ = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (inQ) {
+        if (c === '"' && line[i + 1] === '"') { cur += '"'; i++; }
+        else if (c === '"') inQ = false;
+        else cur += c;
+      } else if (c === '"') inQ = true;
+      else if (c === ",") { out.push(cur); cur = ""; }
+      else cur += c;
+    }
+    out.push(cur);
+    return out.map((s) => s.trim());
+  };
+
+  const header = splitCsv(lines[0]).map((h) => h.toLowerCase().replace(/\s+/g, "_"));
+  const idx = {
+    name: header.indexOf("name"),
+    formula: header.indexOf("formula"),
+    rt: header.findIndex((h) => h === "rt_expected" || h === "rt" || h === "rtexpected"),
+    mz: header.indexOf("mz"),
+  };
+  if (idx.name < 0) errors.push("Missing required 'name' column.");
+  if (idx.rt < 0) errors.push("Missing required 'rt_expected' column.");
+  if (errors.length) return { rows, errors };
+
+  for (let li = 1; li < lines.length; li++) {
+    const cols = splitCsv(lines[li]);
+    const name = (cols[idx.name] ?? "").trim();
+    const formula = idx.formula >= 0 ? (cols[idx.formula] ?? "").trim() : "";
+    const rtRaw = (cols[idx.rt] ?? "").trim();
+    const mzRaw = idx.mz >= 0 ? (cols[idx.mz] ?? "").trim() : "";
+    if (!name) { errors.push(`Row ${li + 1}: missing name.`); continue; }
+    const rt = parseFloat(rtRaw);
+    if (!Number.isFinite(rt) || rt < 0 || rt > 120) {
+      errors.push(`Row ${li + 1} (${name}): rt_expected must be 0–120.`); continue;
+    }
+    const mzNum = mzRaw ? parseFloat(mzRaw) : NaN;
+    const hasMz = Number.isFinite(mzNum) && mzNum > 0;
+    const mzPos = formula ? mzFromFormula(formula, "[M+H]+") : null;
+    if (mzPos == null && !hasMz) {
+      errors.push(`Row ${li + 1} (${name}): provide a valid formula or numeric mz.`); continue;
+    }
+    rows.push({ name, formula, rtExpected: rt, mz: hasMz ? mzNum : null });
+  }
+  return { rows, errors };
+}
+
+function CsvImportButton({
+  addFn,
+  onImported,
+}: {
+  addFn: (args: { data: ParsedRow }) => Promise<Analyte>;
+  onImported: (saved: Analyte[]) => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleFile(file: File) {
+    setBusy(true);
+    try {
+      const text = await file.text();
+      const { rows, errors } = parseAnalyteCsv(text);
+      if (errors.length && rows.length === 0) {
+        toast.error(errors.slice(0, 3).join(" "));
+        return;
+      }
+      if (errors.length) {
+        toast.warning(`${errors.length} row(s) skipped. Importing ${rows.length}…`);
+      }
+      const saved: Analyte[] = [];
+      let failed = 0;
+      for (const r of rows) {
+        try {
+          const s = await addFn({ data: r });
+          saved.push(s);
+        } catch (e: any) {
+          failed++;
+          console.error("Import row failed", r, e);
+        }
+      }
+      if (saved.length) {
+        onImported(saved);
+        toast.success(`Imported ${saved.length} compound${saved.length === 1 ? "" : "s"}${failed ? ` (${failed} failed)` : ""}.`);
+      } else {
+        toast.error("No compounds imported.");
+      }
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to read file.");
+    } finally {
+      setBusy(false);
+      if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  return (
+    <>
+      <input
+        ref={inputRef}
+        type="file"
+        accept=".csv,text/csv"
+        className="hidden"
+        onChange={(e) => {
+          const f = e.target.files?.[0];
+          if (f) handleFile(f);
+        }}
+      />
+      <Button
+        size="sm"
+        variant="outline"
+        disabled={busy}
+        onClick={() => inputRef.current?.click()}
+      >
+        <Upload className="mr-1 h-3.5 w-3.5" />
+        {busy ? "Importing…" : "Import CSV"}
+      </Button>
+    </>
+  );
+}
+
