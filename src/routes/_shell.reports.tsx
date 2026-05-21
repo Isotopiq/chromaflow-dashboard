@@ -284,29 +284,40 @@ function Reports() {
             </div>
           </div>
 
-          <div className="mt-5 text-[10px] uppercase tracking-widest text-muted-foreground">
-            Sections
+          <div className="mt-5 flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
+            <span>Sections</span>
+            <span className="normal-case tracking-normal">Drag order via ↑ ↓</span>
           </div>
           <div className="mt-2 space-y-1">
-            {(
-              [
-                ["method", "Method parameters"],
-                ["column", "Column (type & dimensions)"],
-                ["gradientTable", "Gradient timetable"],
-                ["gradientPlot", "Gradient plot"],
-                ["chromatogram", "Chromatogram (TIC)"],
-                ["peaks", "Peak table"],
-                ["eics", "Extracted ion chromatograms"],
-                ["notes", "Notes"],
-              ] as const
-            ).map(([key, label]) => (
-              <label key={key} className="flex cursor-pointer items-center gap-2 text-xs">
+            {sectionOrder.map((key, idx) => (
+              <div
+                key={key}
+                className="flex items-center gap-1 rounded-md px-1 py-0.5 hover:bg-accent/20"
+              >
                 <Checkbox
                   checked={sections[key]}
                   onCheckedChange={(v) => setSections({ ...sections, [key]: !!v })}
                 />
-                {label}
-              </label>
+                <span className="flex-1 text-xs">{SECTION_LABELS[key]}</span>
+                <button
+                  type="button"
+                  onClick={() => moveSection(idx, -1)}
+                  disabled={idx === 0}
+                  className="rounded p-0.5 text-muted-foreground hover:bg-accent/40 hover:text-foreground disabled:opacity-30"
+                  aria-label={`Move ${SECTION_LABELS[key]} up`}
+                >
+                  <ChevronUp className="h-3 w-3" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => moveSection(idx, 1)}
+                  disabled={idx === sectionOrder.length - 1}
+                  className="rounded p-0.5 text-muted-foreground hover:bg-accent/40 hover:text-foreground disabled:opacity-30"
+                  aria-label={`Move ${SECTION_LABELS[key]} down`}
+                >
+                  <ChevronDown className="h-3 w-3" />
+                </button>
+              </div>
             ))}
           </div>
 
