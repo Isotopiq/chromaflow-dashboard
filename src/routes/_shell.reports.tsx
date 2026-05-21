@@ -23,6 +23,7 @@ import {
 import { renderReportPdf } from "@/lib/pdf-report";
 import { ShareDialog } from "@/components/share-dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Textarea } from "@/components/ui/textarea";
 
 export const Route = createFileRoute("/_shell/reports")({
   component: Reports,
@@ -39,6 +40,7 @@ function Reports() {
     notes: true,
   });
   const [selectedEicIds, setSelectedEicIds] = useState<Set<string>>(new Set());
+  const [customNotes, setCustomNotes] = useState("");
   const [busy, setBusy] = useState(false);
   const printRef = useRef<HTMLDivElement | null>(null);
 
@@ -235,6 +237,20 @@ function Reports() {
             ))}
           </div>
 
+          {sections.notes && (
+            <div className="mt-4">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Custom notes
+              </div>
+              <Textarea
+                value={customNotes}
+                onChange={(e) => setCustomNotes(e.target.value)}
+                placeholder="Add your own notes to include in the report…"
+                className="mt-2 h-28 text-xs"
+              />
+            </div>
+          )}
+
           {sections.eics && (
             <>
               <div className="mt-5 flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
@@ -395,6 +411,14 @@ function Reports() {
                   Notes
                 </h3>
                 <p className="mt-2 text-xs text-muted-foreground">{method.notes}</p>
+                {customNotes.trim() && (
+                  <div className="mt-3 rounded-md border border-border bg-muted/20 p-2">
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                      Analyst notes
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap text-xs">{customNotes}</p>
+                  </div>
+                )}
                 <div className="mt-2 flex flex-wrap gap-1">
                   {method.tags.map((t) => (
                     <Badge key={t} variant="outline" className="text-[10px]">
