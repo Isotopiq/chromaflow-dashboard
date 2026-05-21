@@ -1,0 +1,14 @@
+node_modules
+dist
+.cache
+.vite
+.lovable
+.git
+.github
+.vscode
+*.log
+.DS_Store
+.env
+.env.*
+!.env.example
+coverage
