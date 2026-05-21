@@ -49,6 +49,7 @@ function Reports() {
   const createReportFn = useServerFn(createReport);
   const listReportsFn = useServerFn(listReports);
   const getReportUrlFn = useServerFn(getReportSignedUrl);
+  const deleteReportFn = useServerFn(deleteReport);
   const getEicBatchFn = useServerFn(getRunEICBatch);
   const qc = useQueryClient();
 
