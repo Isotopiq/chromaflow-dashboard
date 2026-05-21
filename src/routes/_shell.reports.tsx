@@ -426,9 +426,10 @@ function Reports() {
             <div className="flex items-center justify-between border-b border-border pb-3">
               <div>
                 <div className="text-[10px] uppercase tracking-[0.2em] text-primary">
-                  CHROMA.LAB · Method Report
+                  {reportHeader.trim() || "CHROMA.LAB · Method Report"}
                 </div>
                 <h2 className="mt-1 text-lg font-semibold">{effectiveTitle}</h2>
+
               </div>
               <FileText className="h-5 w-5 text-muted-foreground" />
             </div>
