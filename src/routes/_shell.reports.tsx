@@ -411,6 +411,14 @@ function Reports() {
                   Notes
                 </h3>
                 <p className="mt-2 text-xs text-muted-foreground">{method.notes}</p>
+                {customNotes.trim() && (
+                  <div className="mt-3 rounded-md border border-border bg-muted/20 p-2">
+                    <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                      Analyst notes
+                    </div>
+                    <p className="mt-1 whitespace-pre-wrap text-xs">{customNotes}</p>
+                  </div>
+                )}
                 <div className="mt-2 flex flex-wrap gap-1">
                   {method.tags.map((t) => (
                     <Badge key={t} variant="outline" className="text-[10px]">
