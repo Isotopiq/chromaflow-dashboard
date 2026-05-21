@@ -38,7 +38,8 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
+import { useRef } from "react";
 import { toast } from "sonner";
 import { addAnalyte, updateAnalyte, deleteAnalyte } from "@/lib/lab.functions";
 import { monoisotopicMass, mzFromFormula } from "@/lib/chem";
@@ -122,33 +123,45 @@ function LibraryTab() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="text-xs text-muted-foreground">
           Add compounds, edit library entries, or open a compound to compare it across columns.
         </div>
-        <Dialog open={creating} onOpenChange={setCreating}>
-          <DialogTrigger asChild>
-            <Button size="sm">
-              <Plus className="mr-1 h-3.5 w-3.5" /> Add compound
-            </Button>
-          </DialogTrigger>
-          <CompoundFormDialog
-            title="Add compound"
-            initial={null}
-            onSubmit={async (vals) => {
-              try {
-                const saved = await addFn({ data: vals });
-                addLocal(saved);
-                qc.invalidateQueries({ queryKey: ["lab"] });
-                toast.success(`Added ${saved.name}`);
-                setCreating(false);
-              } catch (e: any) {
-                toast.error(e?.message ?? "Failed to add compound");
-                throw e;
-              }
+        <div className="flex items-center gap-2">
+          <Button size="sm" variant="outline" onClick={downloadCsvTemplate}>
+            <Download className="mr-1 h-3.5 w-3.5" /> CSV template
+          </Button>
+          <CsvImportButton
+            onImported={(saved) => {
+              for (const a of saved) addLocal(a);
+              qc.invalidateQueries({ queryKey: ["lab"] });
             }}
+            addFn={addFn}
           />
-        </Dialog>
+          <Dialog open={creating} onOpenChange={setCreating}>
+            <DialogTrigger asChild>
+              <Button size="sm">
+                <Plus className="mr-1 h-3.5 w-3.5" /> Add compound
+              </Button>
+            </DialogTrigger>
+            <CompoundFormDialog
+              title="Add compound"
+              initial={null}
+              onSubmit={async (vals) => {
+                try {
+                  const saved = await addFn({ data: vals });
+                  addLocal(saved);
+                  qc.invalidateQueries({ queryKey: ["lab"] });
+                  toast.success(`Added ${saved.name}`);
+                  setCreating(false);
+                } catch (e: any) {
+                  toast.error(e?.message ?? "Failed to add compound");
+                  throw e;
+                }
+              }}
+            />
+          </Dialog>
+        </div>
       </div>
 
       <Card className="border-border bg-card p-0">
