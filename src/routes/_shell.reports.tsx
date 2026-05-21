@@ -691,3 +691,129 @@ function EicReportBlock({
     </>
   );
 }
+
+function GradientPlot({
+  gradient,
+}: {
+  gradient: { time: number; pctB: number; flow: number }[];
+}) {
+  const w = 560;
+  const h = 180;
+  const padL = 36;
+  const padR = 36;
+  const padT = 10;
+  const padB = 26;
+  const pts = [...gradient].sort((a, b) => a.time - b.time);
+  const tMin = pts[0].time;
+  const tMax = pts[pts.length - 1].time;
+  const tSpan = Math.max(0.001, tMax - tMin);
+  const flowMax = Math.max(...pts.map((p) => p.flow));
+  const flowMin = Math.min(...pts.map((p) => p.flow));
+  const flowSpan = Math.max(0.001, flowMax - flowMin);
+  const xOf = (t: number) => padL + ((t - tMin) / tSpan) * (w - padL - padR);
+  const yB = (b: number) => padT + (1 - b / 100) * (h - padT - padB);
+  const yF = (f: number) =>
+    padT + (1 - (f - flowMin) / flowSpan) * (h - padT - padB);
+  const bPath = pts.map((p, i) => `${i ? "L" : "M"}${xOf(p.time)},${yB(p.pctB)}`).join(" ");
+  const fPath = pts.map((p, i) => `${i ? "L" : "M"}${xOf(p.time)},${yF(p.flow)}`).join(" ");
+  const yTicks = [0, 25, 50, 75, 100];
+  const tTicks = 5;
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} className="w-full" role="img" aria-label="Gradient plot">
+      {yTicks.map((b) => (
+        <g key={b}>
+          <line
+            x1={padL}
+            x2={w - padR}
+            y1={yB(b)}
+            y2={yB(b)}
+            stroke="currentColor"
+            strokeOpacity={0.08}
+          />
+          <text
+            x={padL - 4}
+            y={yB(b) + 3}
+            textAnchor="end"
+            fontSize="9"
+            fill="currentColor"
+            opacity={0.55}
+          >
+            {b}
+          </text>
+        </g>
+      ))}
+      {Array.from({ length: tTicks + 1 }).map((_, i) => {
+        const t = tMin + (i / tTicks) * tSpan;
+        return (
+          <text
+            key={i}
+            x={xOf(t)}
+            y={h - padB + 14}
+            textAnchor="middle"
+            fontSize="9"
+            fill="currentColor"
+            opacity={0.55}
+          >
+            {t.toFixed(1)}
+          </text>
+        );
+      })}
+      <text
+        x={padL - 28}
+        y={padT + 8}
+        fontSize="9"
+        fill="currentColor"
+        opacity={0.7}
+      >
+        % B
+      </text>
+      <text
+        x={w - padR + 4}
+        y={padT + 8}
+        fontSize="9"
+        fill="currentColor"
+        opacity={0.7}
+      >
+        Flow
+      </text>
+      <text
+        x={(w - padL - padR) / 2 + padL}
+        y={h - 4}
+        textAnchor="middle"
+        fontSize="9"
+        fill="currentColor"
+        opacity={0.7}
+      >
+        Time (min)
+      </text>
+      <path d={bPath} fill="none" stroke="hsl(var(--primary))" strokeWidth={1.75} />
+      <path
+        d={fPath}
+        fill="none"
+        stroke="currentColor"
+        strokeOpacity={0.55}
+        strokeWidth={1.25}
+        strokeDasharray="3 3"
+      />
+      {pts.map((p, i) => (
+        <circle key={i} cx={xOf(p.time)} cy={yB(p.pctB)} r={2} fill="hsl(var(--primary))" />
+      ))}
+      <g transform={`translate(${w - padR - 110}, ${padT + 4})`}>
+        <rect width={110} height={28} fill="white" fillOpacity={0.6} rx={3} />
+        <line x1={6} x2={20} y1={10} y2={10} stroke="hsl(var(--primary))" strokeWidth={1.75} />
+        <text x={24} y={13} fontSize="9" fill="currentColor">% B</text>
+        <line
+          x1={56}
+          x2={70}
+          y1={10}
+          y2={10}
+          stroke="currentColor"
+          strokeOpacity={0.55}
+          strokeWidth={1.25}
+          strokeDasharray="3 3"
+        />
+        <text x={74} y={13} fontSize="9" fill="currentColor">Flow</text>
+      </g>
+    </svg>
+  );
+}
