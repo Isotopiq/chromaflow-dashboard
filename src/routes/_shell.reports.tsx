@@ -56,11 +56,11 @@ function Reports() {
   });
 
   const eicCandidates = useMemo(
-    () => analytes.filter((a) => Number.isFinite(a.mz) && a.mz > 0),
+    () => analytes.filter((a: Analyte) => Number.isFinite(a.mz) && a.mz > 0),
     [analytes],
   );
   const selectedEicAnalytes = useMemo(
-    () => eicCandidates.filter((a) => selectedEicIds.has(a.id)),
+    () => eicCandidates.filter((a: Analyte) => selectedEicIds.has(a.id)),
     [eicCandidates, selectedEicIds],
   );
 
