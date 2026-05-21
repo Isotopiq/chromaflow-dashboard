@@ -109,7 +109,7 @@ function Reports() {
     setBusy(true);
     try {
       const blob = await renderReportPdf(printRef.current);
-      const filename = `${method.name.replace(/\s+/g, "_")}.pdf`;
+      const filename = `${effectiveTitle.replace(/\s+/g, "_")}.pdf`;
       let up;
       try {
         up = await uploadFn({ data: { filename, bucket: "reports" } });
