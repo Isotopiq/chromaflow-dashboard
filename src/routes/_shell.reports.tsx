@@ -51,6 +51,36 @@ function Reports() {
     eics: true,
     notes: true,
   });
+  type SectionKey = keyof typeof sections;
+  const SECTION_LABELS: Record<SectionKey, string> = {
+    method: "Method parameters",
+    column: "Column (type & dimensions)",
+    gradientTable: "Gradient timetable",
+    gradientPlot: "Gradient plot",
+    chromatogram: "Chromatogram (TIC)",
+    peaks: "Peak table",
+    eics: "Extracted ion chromatograms",
+    notes: "Notes",
+  };
+  const [sectionOrder, setSectionOrder] = useState<SectionKey[]>([
+    "method",
+    "column",
+    "gradientTable",
+    "gradientPlot",
+    "chromatogram",
+    "peaks",
+    "eics",
+    "notes",
+  ]);
+  const moveSection = (idx: number, dir: -1 | 1) => {
+    setSectionOrder((prev) => {
+      const j = idx + dir;
+      if (j < 0 || j >= prev.length) return prev;
+      const next = prev.slice();
+      [next[idx], next[j]] = [next[j], next[idx]];
+      return next;
+    });
+  };
   const [selectedEicIds, setSelectedEicIds] = useState<Set<string>>(new Set());
   const [customNotes, setCustomNotes] = useState("");
   const [reportTitle, setReportTitle] = useState("");
