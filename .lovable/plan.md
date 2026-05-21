@@ -1,106 +1,78 @@
-# Fix Easypanel Docker Compose deployment for good
+# Fix Easypanel environment variable injection
 
 ## Actual problem
 
-The build is now successful and it does create:
+The app now starts successfully with `vite preview`, so the Docker runtime/router issue is fixed.
+
+The new error is different:
 
 ```text
-dist/server/server.js
+[supabase] Supabase env vars are not all set
+error: supabaseUrl is required.
 ```
 
-The remaining crash happens after the container starts:
+This means the container is running, but the Supabase variables are empty inside the container.
 
-```text
-Error: Could not resolve entry for router entry: router in /app/src
+The likely cause is the current Compose file:
+
+```yaml
+LAB_SUPABASE_URL: ${LAB_SUPABASE_URL:-}
 ```
 
-This is because the runtime command is still:
-
-```text
-vite preview --host 0.0.0.0 --port 5273
-```
-
-TanStack Start's Vite preview server re-loads `vite.config.ts` at container startup. During that config load it checks for the router source entry at `src/router.tsx`. The current runtime Docker image only copies `dist`, `package.json`, `vite.config.ts`, and `tsconfig.json`, so `/app/src/router.tsx` is missing even though the built server exists.
+In Docker Compose, this is interpolation. If Easypanel stores variables in the service GUI but does not also write them into the Compose interpolation environment, Compose resolves them to empty strings before the container starts. That empty string then overrides any runtime variable with the same name.
 
 ## Changes to make
 
-### 1. Dockerfile: restore the required source directory in the runtime image
+### 1. Docker Compose: stop interpolating secrets
 
-Add this back to the runtime stage:
+Change the `environment` block from key/value interpolation to a pass-through list:
+
+```yaml
+environment:
+  - NODE_ENV=production
+  - HOST=0.0.0.0
+  - PORT=5273
+  - LAB_SUPABASE_URL
+  - LAB_SUPABASE_ANON_KEY
+  - LAB_SUPABASE_SERVICE_ROLE_KEY
+  - SUPABASE_URL
+  - SUPABASE_ANON_KEY
+  - SUPABASE_PUBLISHABLE_KEY
+  - SUPABASE_SERVICE_ROLE_KEY
+  - SUPABASE_PROJECT_ID
+  - LOVABLE_API_KEY
+```
+
+This prevents Compose from replacing secrets with empty strings. Easypanel can inject the values from the GUI directly at runtime.
+
+### 2. Server config: do not create Supabase clients with empty values
+
+Update `src/integrations/supabase/client.server.ts` so it validates env vars before calling `createClient()`.
+
+Instead of letting Supabase throw the unclear `supabaseUrl is required`, the app should throw a direct message naming the accepted variable names:
+
+```text
+Missing Supabase runtime environment variables. Set either LAB_SUPABASE_URL or SUPABASE_URL, either LAB_SUPABASE_ANON_KEY / SUPABASE_ANON_KEY / SUPABASE_PUBLISHABLE_KEY, and either LAB_SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SERVICE_ROLE_KEY.
+```
+
+### 3. Keep the previous Docker runtime fix
+
+Keep these existing fixes:
 
 ```dockerfile
 COPY --from=builder /app/src ./src
 ```
 
-Keep the existing `dist/server/server.js` fix in `vite.config.ts`. The final runtime image should contain both:
+and:
 
-```text
-/app/dist/server/server.js
-/app/src/router.tsx
+```ts
+cloudflare: false,
+tanstackStart: { server: { entry: "server" } }
 ```
 
-This directly fixes the current container loop.
+## Easypanel settings
 
-### 2. Docker Compose: make it Easypanel-safe
-
-Update `docker-compose.yml` so it does not produce noisy unset-variable warnings and so it uses the environment variable names the app actually reads.
-
-The app currently reads these server-side names:
-
-```text
-LAB_SUPABASE_URL
-LAB_SUPABASE_ANON_KEY
-LAB_SUPABASE_SERVICE_ROLE_KEY
-```
-
-The Compose file should pass those through, and can also pass the standard aliases for compatibility:
-
-```text
-SUPABASE_URL
-SUPABASE_PUBLISHABLE_KEY
-SUPABASE_SERVICE_ROLE_KEY
-SUPABASE_PROJECT_ID
-```
-
-Use `${VAR:-}` defaults where interpolation remains, so Easypanel deploy logs do not warn and fail noisily when optional variables are absent.
-
-### 3. Optional compatibility guard in server config
-
-Update the server-side Supabase config to accept both naming styles:
-
-```text
-LAB_SUPABASE_URL or SUPABASE_URL
-LAB_SUPABASE_ANON_KEY or SUPABASE_PUBLISHABLE_KEY
-LAB_SUPABASE_SERVICE_ROLE_KEY or SUPABASE_SERVICE_ROLE_KEY
-```
-
-This prevents future deployment failures caused only by using the standard Supabase variable names in Easypanel.
-
-## Expected result
-
-After redeploying, the container should start and stay running:
-
-```text
-vite preview --host 0.0.0.0 --port 5273
-Local:   http://localhost:5273/
-Network: http://...:5273/
-```
-
-It should no longer crash with either:
-
-```text
-Cannot find module '/app/dist/server/server.js'
-```
-
-or:
-
-```text
-Could not resolve entry for router entry: router in /app/src
-```
-
-## Easypanel environment variables to set
-
-Set at least these in Easypanel:
+Use the Easypanel service Environment tab and set these exact names:
 
 ```text
 LAB_SUPABASE_URL=https://your-supabase-url
@@ -108,11 +80,24 @@ LAB_SUPABASE_ANON_KEY=your-anon-or-publishable-key
 LAB_SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
 ```
 
-If you prefer the standard names, the compatibility guard will also support:
+Optional:
 
 ```text
-SUPABASE_URL=https://your-supabase-url
-SUPABASE_PUBLISHABLE_KEY=your-anon-or-publishable-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-SUPABASE_PROJECT_ID=selfhosted
+LOVABLE_API_KEY=your-key-if-ai-features-are-used
 ```
+
+## Should you click “Create .env” in Easypanel?
+
+With the updated pass-through Compose file: no, it should not be required.
+
+If Easypanel only supports Compose interpolation in your setup and does not inject GUI variables into Compose services directly, then clicking “Create .env” can make interpolation work. But the better fix is removing interpolation from secrets in `docker-compose.yml`, so the app does not depend on that option.
+
+## Expected result
+
+After redeploying, the container should keep running and should no longer log:
+
+```text
+supabaseUrl is required
+```
+
+If a variable is still missing, the log will clearly name which accepted env names must be set.
