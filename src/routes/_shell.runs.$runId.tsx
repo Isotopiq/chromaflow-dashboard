@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ChromatogramPlot } from "@/components/chromatogram-plot";
 import { PeakTable } from "@/components/peak-table";
-import { ago } from "@/lib/mock-data";
+import { ago } from "@/lib/time";
 import { toast } from "sonner";
 import { getRunEIC, getRunEICBatch, deleteRun, addManualPeak } from "@/lib/lab.functions";
 import { integrateBand, type IntegrationResult } from "@/lib/peak-math";
@@ -407,7 +407,7 @@ function RunDetail() {
         <div className="mb-3 flex flex-wrap gap-1.5">
           {libraryTargets.length === 0 ? (
             <div className="text-xs text-muted-foreground">
-              No analytes in library. Run the seed SQL to add common compounds.
+              No analytes in library. Add analytes manually or upload a CSV from the Analytes page.
             </div>
           ) : (
             libraryTargets.map((t) => {

@@ -602,20 +602,24 @@ export const createReport = createServerFn({ method: "POST" })
   .inputValidator((d) => ReportInput.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context as any;
-    const { data: row, error } = await supabase
-      .from("reports")
-      .insert({
-        title: data.title,
-        template: data.template,
-        run_ids: data.runIds,
-        batch_id: data.batchId ?? null,
-        storage_path: data.storagePath,
-        created_by: userId,
-      })
-      .select()
-      .single();
+    const row = {
+      title: data.title,
+      template: data.template,
+      run_ids: data.runIds,
+      batch_id: data.batchId ?? null,
+      storage_path: data.storagePath,
+      created_by: userId,
+    };
+    const insert = async (payload: Record<string, unknown>) =>
+      await supabase.from("reports").insert(payload).select().single();
+    let { data: saved, error } = await insert(row);
+    const schemaCacheError = (e: any) => /schema cache|column/i.test(e?.message ?? "");
+    if (error && schemaCacheError(error)) {
+      const { run_ids: _runIds, batch_id: _batchId, ...withoutOptionalRefs } = row;
+      ({ data: saved, error } = await insert(withoutOptionalRefs));
+    }
     if (error) throw error;
-    return row;
+    return saved;
   });
 
 export const listReports = createServerFn({ method: "GET" })

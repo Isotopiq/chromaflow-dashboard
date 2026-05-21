@@ -16,3 +16,5 @@ alter table public.reports add column if not exists batch_id     uuid references
 alter table public.reports add column if not exists run_ids      uuid[] not null default '{}';
 alter table public.reports add column if not exists template     text;
 alter table public.reports add column if not exists storage_path text;
+
+notify pgrst, 'reload schema';

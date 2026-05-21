@@ -25,7 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChromatogramPlot } from "@/components/chromatogram-plot";
-import { ago } from "@/lib/mock-data";
+import { ago } from "@/lib/time";
 
 const MAX_RUNS = 6;
 
@@ -99,16 +99,7 @@ export function AnalyteComparePanel({
           if (run.scansBlobPath) {
             return await fetchEIC({ data: { runId: id, mz, ppm } });
           }
-          // Fallback: use TIC trace as a stand-in so synthetic/seed runs still plot.
-          return {
-            x: run.trace.x,
-            y: run.trace.tic,
-            mz,
-            ppm,
-            mzLow: 0,
-            mzHigh: 0,
-            fallback: true as const,
-          };
+          return null;
         },
       };
     }),
@@ -123,7 +114,7 @@ export function AnalyteComparePanel({
       name: run.name,
       trace: data
         ? { x: data.x, tic: data.y, bpc: data.y }
-        : run.trace,
+        : { x: [], tic: [], bpc: [] },
     };
   });
 
@@ -133,7 +124,7 @@ export function AnalyteComparePanel({
     const method = methods.find((m) => m.id === run.methodId);
     const q = queries[i];
     const data = q.data;
-    const fallback = (data as any)?.fallback === true;
+    const fallback = false;
 
     let metrics: ReturnType<typeof integrateBand> | null = null;
     let annotated = false;
@@ -371,7 +362,7 @@ export function AnalyteComparePanel({
               Per-run metrics
             </div>
             <div className="text-xs text-muted-foreground">
-              EIC integration around the apex (±0.4 min). Fallback uses TIC trace + annotated peaks for runs without raw scans.
+              EIC integration around the apex (±0.4 min). Runs without raw scans are excluded from EIC extraction.
             </div>
           </div>
           <Table>
