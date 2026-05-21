@@ -42,7 +42,9 @@ export const Route = createFileRoute("/_shell/reports")({
 
 function Reports() {
   const { runs, methods, analytes, columns } = useLab();
+  const { data: branding } = useBranding();
   const [methodId, setMethodId] = useState(methods[0]?.id ?? "");
+
   const [sections, setSections] = useState({
     method: true,
     column: true,
