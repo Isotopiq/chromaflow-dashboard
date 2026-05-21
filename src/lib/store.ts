@@ -1,14 +1,13 @@
 import { create } from "zustand";
-import {
-  ANALYTES,
-  type Method,
-  type Run,
-  type Column,
-  type Batch,
-  type Analyte,
-  type User,
-  CURRENT_USER,
-} from "./mock-data";
+import type { Method, Run, Column, Batch, Analyte, User, Peak } from "./lab-types";
+
+const EMPTY_USER: User = {
+  id: "",
+  name: "Loading…",
+  email: "",
+  role: "developer",
+  avatar: "—",
+};
 
 type State = {
   methods: Method[];
@@ -36,7 +35,7 @@ type State = {
   updateAnalyteLocal: (a: Analyte) => void;
   removeAnalyteLocal: (id: string) => void;
   annotatePeakLocal: (runId: string, peakId: string, label: string, analyteId?: string) => void;
-  addPeakLocal: (runId: string, peak: import("./mock-data").Peak) => void;
+  addPeakLocal: (runId: string, peak: Peak) => void;
   removeRunLocal: (id: string) => void;
   removeBatchLocal: (id: string) => void;
 };
@@ -46,9 +45,9 @@ export const useLab = create<State>((set) => ({
   runs: [],
   columns: [],
   batches: [],
-  analytes: ANALYTES,
+  analytes: [],
   users: [],
-  currentUser: CURRENT_USER,
+  currentUser: EMPTY_USER,
   hydrated: false,
   setAll: (s) =>
     set(() => ({
@@ -56,7 +55,7 @@ export const useLab = create<State>((set) => ({
       runs: s.runs,
       columns: s.columns,
       batches: s.batches,
-      analytes: s.analytes.length ? s.analytes : ANALYTES,
+      analytes: s.analytes,
       currentUser: s.currentUser,
       hydrated: true,
     })),
