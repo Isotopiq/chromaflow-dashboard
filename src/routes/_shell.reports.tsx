@@ -135,7 +135,7 @@ function Reports() {
       }
       const report = await createReportFn({
         data: {
-          title: method.name,
+          title: effectiveTitle,
           template: "method",
           runIds: methodRun ? [methodRun.id] : [],
           storagePath: up.path,
