@@ -15,10 +15,12 @@ import {
   createReport,
   createUploadUrl,
   getReportSignedUrl,
+  getRunEICBatch,
   listReports,
 } from "@/lib/lab.functions";
 import { renderReportPdf } from "@/lib/pdf-report";
 import { ShareDialog } from "@/components/share-dialog";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 export const Route = createFileRoute("/_shell/reports")({
   component: Reports,
