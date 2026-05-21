@@ -1,11 +1,22 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const url = process.env.LAB_SUPABASE_URL!;
-const serviceKey = process.env.LAB_SUPABASE_SERVICE_ROLE_KEY!;
-const anonKey = process.env.LAB_SUPABASE_ANON_KEY!;
+// Accept both LAB_* and standard SUPABASE_* env var names so the same
+// build works under Lovable Cloud and self-hosted Easypanel deployments.
+const url = process.env.LAB_SUPABASE_URL || process.env.SUPABASE_URL || "";
+const serviceKey =
+  process.env.LAB_SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  "";
+const anonKey =
+  process.env.LAB_SUPABASE_ANON_KEY ||
+  process.env.SUPABASE_PUBLISHABLE_KEY ||
+  process.env.SUPABASE_ANON_KEY ||
+  "";
 
 if (!url || !serviceKey || !anonKey) {
-  console.warn("[supabase] LAB_SUPABASE_* env vars are not all set");
+  console.warn(
+    "[supabase] Supabase env vars are not all set (need URL, service role, anon/publishable key)",
+  );
 }
 
 /** Service-role client. Bypasses RLS. Server-only. */

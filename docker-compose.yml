@@ -1,8 +1,9 @@
 # Easypanel-compatible Compose file for CHROMA.LAB.
 # In Easypanel: create a "Compose" service pointed at this repo and set the
 # environment variables listed below in the service's Environment tab.
-# Easypanel injects them at container runtime, so no `:?` strict checks
-# and no build args are used here.
+# Easypanel injects them at container runtime — no build args, no strict
+# ${VAR:?} checks, and ${VAR:-} defaults so missing optional vars do not
+# trigger noisy "variable is not set" warnings during deploy.
 
 services:
   chroma-lab:
@@ -18,15 +19,15 @@ services:
       NODE_ENV: production
       HOST: 0.0.0.0
       PORT: 5273
-      # Server-side Supabase config (used by server functions / SSR)
-      SUPABASE_URL: ${SUPABASE_URL}
-      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY}
-      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY}
-      SUPABASE_PROJECT_ID: ${SUPABASE_PROJECT_ID}
-      # Client-side Supabase config (read by the browser bundle at runtime)
-      VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
-      VITE_SUPABASE_PUBLISHABLE_KEY: ${VITE_SUPABASE_PUBLISHABLE_KEY}
-      VITE_SUPABASE_PROJECT_ID: ${VITE_SUPABASE_PROJECT_ID}
+      # Server-side Supabase config (primary names the app reads)
+      LAB_SUPABASE_URL: ${LAB_SUPABASE_URL:-}
+      LAB_SUPABASE_ANON_KEY: ${LAB_SUPABASE_ANON_KEY:-}
+      LAB_SUPABASE_SERVICE_ROLE_KEY: ${LAB_SUPABASE_SERVICE_ROLE_KEY:-}
+      # Standard Supabase aliases (also accepted by the app)
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_PUBLISHABLE_KEY: ${SUPABASE_PUBLISHABLE_KEY:-}
+      SUPABASE_SERVICE_ROLE_KEY: ${SUPABASE_SERVICE_ROLE_KEY:-}
+      SUPABASE_PROJECT_ID: ${SUPABASE_PROJECT_ID:-selfhosted}
       # Optional: only needed if Lovable AI features are used
       LOVABLE_API_KEY: ${LOVABLE_API_KEY:-}
     healthcheck:
