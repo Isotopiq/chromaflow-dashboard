@@ -237,6 +237,20 @@ function Reports() {
             ))}
           </div>
 
+          {sections.notes && (
+            <div className="mt-4">
+              <div className="text-[10px] uppercase tracking-widest text-muted-foreground">
+                Custom notes
+              </div>
+              <Textarea
+                value={customNotes}
+                onChange={(e) => setCustomNotes(e.target.value)}
+                placeholder="Add your own notes to include in the report…"
+                className="mt-2 h-28 text-xs"
+              />
+            </div>
+          )}
+
           {sections.eics && (
             <>
               <div className="mt-5 flex items-center justify-between text-[10px] uppercase tracking-widest text-muted-foreground">
