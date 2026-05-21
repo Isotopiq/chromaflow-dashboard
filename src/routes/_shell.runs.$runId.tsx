@@ -407,7 +407,7 @@ function RunDetail() {
         <div className="mb-3 flex flex-wrap gap-1.5">
           {libraryTargets.length === 0 ? (
             <div className="text-xs text-muted-foreground">
-              No analytes in library. Run the seed SQL to add common compounds.
+              No analytes in library. Add analytes manually or upload a CSV from the Analytes page.
             </div>
           ) : (
             libraryTargets.map((t) => {
