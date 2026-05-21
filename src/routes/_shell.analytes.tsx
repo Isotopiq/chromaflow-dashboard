@@ -173,8 +173,42 @@ function LibraryTab() {
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="text-xs text-muted-foreground">
-          Add compounds, edit library entries, or open a compound to compare it across columns.
+        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+          <span>
+            Add compounds, edit library entries, or open a compound to compare it across columns.
+          </span>
+          {selected.size > 0 && (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  size="sm"
+                  variant="destructive"
+                  disabled={bulkDeleting}
+                  className="h-7"
+                >
+                  <Trash2 className="mr-1 h-3.5 w-3.5" />
+                  Delete selected ({selected.size})
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>
+                    Delete {selected.size} compound{selected.size === 1 ? "" : "s"}?
+                  </AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Removes the selected compounds from your library. Existing peak
+                    annotations are kept.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={bulkDelete}>
+                    {bulkDeleting ? "Deleting…" : "Delete"}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <Button size="sm" variant="outline" onClick={downloadCsvTemplate}>
