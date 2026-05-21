@@ -25,6 +25,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useLab } from "@/lib/store";
+import { useBranding } from "@/lib/use-branding";
+
 
 const groups: Array<{
   label: string;
