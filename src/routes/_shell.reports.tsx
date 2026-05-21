@@ -460,6 +460,15 @@ function Reports() {
                 >
                   <Download className="mr-1 h-3.5 w-3.5" /> Download
                 </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => removeReport(r.id, r.title)}
+                  className="text-destructive hover:text-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
+
               </div>
             </div>
           ))}
