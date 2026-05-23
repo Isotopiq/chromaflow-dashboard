@@ -478,7 +478,21 @@ function RunsList() {
             {runs.map((r) => {
               const m = methods.find((x) => x.id === r.methodId);
               return (
-                <TableRow key={r.id} className="text-xs">
+                <TableRow key={r.id} className="text-xs" data-state={selectedIds.has(r.id) ? "selected" : undefined}>
+                  <TableCell>
+                    <Checkbox
+                      checked={selectedIds.has(r.id)}
+                      onCheckedChange={(v) => {
+                        setSelectedIds((prev) => {
+                          const next = new Set(prev);
+                          if (v) next.add(r.id);
+                          else next.delete(r.id);
+                          return next;
+                        });
+                      }}
+                      aria-label={`Select ${r.name}`}
+                    />
+                  </TableCell>
                   <TableCell>
                     <Link
                       to="/runs/$runId"
