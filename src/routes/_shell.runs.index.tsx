@@ -197,31 +197,61 @@ function RunsList() {
 
       updateJob(id, { status: "saving" });
 
-      const saved = await createRunFn({
-        data: {
-          name: file.name,
-          methodId: methodId || null,
-          columnId: columnId || null,
-          batchId: null,
-          filePath: rawUrl.path,
-          scansBlobPath: scansUrl.path,
-          fileFormat: parsed.summary.format,
-          fileSize: fmtBytes(file.size),
-          ionMode: parsed.summary.ionMode,
-          msLevel: 1,
-          trace: parsed.summary.trace,
-          peaks: parsed.summary.peaks.map((p) => ({
-            rt: p.rt,
-            area: p.area,
-            height: p.height,
-            fwhm: p.fwhm,
-            sn: p.sn,
-            mz: p.mz,
-            mzLow: p.mzLow,
-            mzHigh: p.mzHigh,
-          })),
-        },
-      });
+      const slimTrace = decimateTrace(parsed.summary.trace, 2500);
+      const runPayload = {
+        name: file.name,
+        methodId: methodId || null,
+        columnId: columnId || null,
+        batchId: null,
+        filePath: rawUrl.path,
+        scansBlobPath: scansUrl.path,
+        fileFormat: parsed.summary.format,
+        fileSize: fmtBytes(file.size),
+        ionMode: parsed.summary.ionMode,
+        msLevel: 1,
+        trace: slimTrace,
+        peaks: parsed.summary.peaks.map((p) => ({
+          rt: p.rt,
+          area: p.area,
+          height: p.height,
+          fwhm: p.fwhm,
+          sn: p.sn,
+          mz: p.mz,
+          mzLow: p.mzLow,
+          mzHigh: p.mzHigh,
+        })),
+      };
+
+      // Save with one retry. If both attempts hit a network-style error
+      // (TypeError / "Failed to fetch"), poll the server to see if the
+      // insert already committed — the response just never made it back.
+      let saved: any = null;
+      let lastErr: any = null;
+      for (let attempt = 0; attempt < 2; attempt++) {
+        try {
+          saved = await createRunFn({ data: runPayload });
+          lastErr = null;
+          break;
+        } catch (e: any) {
+          lastErr = e;
+          if (!isNetworkError(e)) throw e;
+          updateJob(id, {
+            status: "saving",
+            message: "Network dropped — checking server…",
+          });
+          await new Promise((r) => setTimeout(r, 800 + attempt * 800));
+        }
+      }
+      if (!saved && lastErr) {
+        // Network failed both times — see if it actually landed server-side.
+        try {
+          const found = await findRunByPathFn({ data: { filePath: rawUrl.path } });
+          if (found.run) saved = found.run;
+        } catch {
+          /* swallow — fall through to the original error below */
+        }
+      }
+      if (!saved) throw lastErr ?? new Error("Failed to save run");
 
       // Push the freshly-saved run into the local store BEFORE navigating
       // so the run-detail route can find it. Without this the route loads,
