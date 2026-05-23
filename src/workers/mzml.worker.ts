@@ -316,21 +316,19 @@ function pickTracePeaks(
 
   const ys = sg5(y);
 
-  // Noise: 20th percentile of all scans (global) — use the trace's own slice
-  // when long enough, otherwise zero.
-  const sortedY = [...ys].sort((a, b) => a - b);
-  const baseline = sortedY[Math.floor(sortedY.length * 0.2)] || 0;
+  // Noise from positive (non-zero) samples only — zeros are gaps where the
+  // ion wasn't detected, not noise. Use lower-half MAD for robustness.
+  const positives = ys.filter((v) => v > 0).sort((a, b) => a - b);
+  if (positives.length < 3) return [];
+  const lowerN = Math.max(1, Math.floor(positives.length / 2));
+  const lower = positives.slice(0, lowerN);
+  const baseline = lower[Math.floor(lower.length / 2)] || 0;
   let madSum = 0;
-  let madN = 0;
-  for (const v of sortedY) {
-    if (v <= baseline * 1.5) {
-      madSum += Math.abs(v - baseline);
-      madN++;
-    }
-  }
-  const noise = Math.max(1, madSum / Math.max(1, madN));
-
-  const minHeight = baseline + 3 * noise;
+  for (const v of lower) madSum += Math.abs(v - baseline);
+  const noise = Math.max(1, (madSum / lower.length) * 1.4826);
+  const apexMax = positives[positives.length - 1];
+  // Peak must be S/N >= 3 AND clearly above the trace's own baseline.
+  const minHeight = Math.max(baseline + 3 * noise, apexMax * 0.05);
   const peaks: TracePeak[] = [];
 
   for (let i = 2; i < len - 2; i++) {
