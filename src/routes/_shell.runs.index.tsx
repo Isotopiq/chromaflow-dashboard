@@ -72,6 +72,70 @@ function RunsList() {
 
   const createRunFn = useServerFn(createRun);
   const createUploadUrlFn = useServerFn(createUploadUrl);
+  const findRunByPathFn = useServerFn(findRunByFilePath);
+
+  // Largest Triangle Three Buckets downsample — keeps the visual shape of a
+  // chromatogram while drastically cutting payload size. Returns a parallel
+  // (x, y) pair of length <= maxPoints.
+  function lttb(x: number[], y: number[], maxPoints: number): { x: number[]; y: number[] } {
+    const n = x.length;
+    if (n <= maxPoints || maxPoints < 3) return { x: x.slice(), y: y.slice() };
+    const outX = new Array<number>(maxPoints);
+    const outY = new Array<number>(maxPoints);
+    outX[0] = x[0];
+    outY[0] = y[0];
+    let a = 0;
+    const bucketSize = (n - 2) / (maxPoints - 2);
+    for (let i = 0; i < maxPoints - 2; i++) {
+      const start = Math.floor((i + 1) * bucketSize) + 1;
+      const end = Math.min(Math.floor((i + 2) * bucketSize) + 1, n);
+      let avgX = 0;
+      let avgY = 0;
+      const range = Math.max(1, end - start);
+      for (let k = start; k < end; k++) {
+        avgX += x[k];
+        avgY += y[k];
+      }
+      avgX /= range;
+      avgY /= range;
+      const rangeStart = Math.floor(i * bucketSize) + 1;
+      const rangeEnd = Math.floor((i + 1) * bucketSize) + 1;
+      let maxArea = -1;
+      let next = rangeStart;
+      const ax = x[a];
+      const ay = y[a];
+      for (let k = rangeStart; k < rangeEnd; k++) {
+        const area = Math.abs((ax - avgX) * (y[k] - ay) - (ax - x[k]) * (avgY - ay));
+        if (area > maxArea) {
+          maxArea = area;
+          next = k;
+        }
+      }
+      outX[i + 1] = x[next];
+      outY[i + 1] = y[next];
+      a = next;
+    }
+    outX[maxPoints - 1] = x[n - 1];
+    outY[maxPoints - 1] = y[n - 1];
+    return { x: outX, y: outY };
+  }
+
+  function decimateTrace(t: { x: number[]; tic: number[]; bpc: number[] }, maxPoints = 2500) {
+    if (t.x.length <= maxPoints) return t;
+    // Decimate TIC and BPC against the same x (drive sampling from TIC).
+    const tic = lttb(t.x, t.tic, maxPoints);
+    // Re-sample BPC at the chosen x indices using a parallel pass.
+    const bpc = lttb(t.x, t.bpc, maxPoints);
+    return { x: tic.x, tic: tic.y, bpc: bpc.y };
+  }
+
+  function isNetworkError(err: any): boolean {
+    const msg = String(err?.message ?? err ?? "");
+    return (
+      err instanceof TypeError ||
+      /failed to fetch|networkerror|load failed|aborted|err_network/i.test(msg)
+    );
+  }
 
   useEffect(() => {
     workerRef.current = new Worker(
