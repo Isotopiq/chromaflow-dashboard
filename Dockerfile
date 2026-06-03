@@ -21,11 +21,11 @@ WORKDIR /app
 ENV NODE_ENV=production \
     HOST=0.0.0.0 \
     PORT=5273
-COPY --from=builder /app/node_modules ./node_modules
+# Only the built SSR server output is needed at runtime. The Node SSR
+# bundle lives at dist/server/server.js and self-contains its deps.
 COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/src ./src
 COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/vite.config.ts ./vite.config.ts
-COPY --from=builder /app/tsconfig.json ./tsconfig.json
 EXPOSE 5273
-CMD ["bun", "run", "preview", "--host", "0.0.0.0", "--port", "5273"]
+# Run the actual SSR server (NOT `vite preview`, which only serves the
+# static client bundle and would break server functions / /api routes).
+CMD ["bun", "dist/server/server.js"]
